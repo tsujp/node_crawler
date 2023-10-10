@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -24,14 +25,15 @@ import (
 var (
 	_status          *Status
 	lastStatusUpdate time.Time
+	ErrNotEthNode    = errors.New("not an eth node")
 )
 
-func getClientInfo(genesis *core.Genesis, networkID uint64, nodeURL string, n *enode.Node) (*common.ClientInfo, error) {
+func GetClientInfo(pk *ecdsa.PrivateKey, genesis *core.Genesis, networkID uint64, nodeURL string, n *enode.Node) (*common.ClientInfo, error) {
 	var info common.ClientInfo
 
-	conn, sk, err := dial(n)
+	conn, err := dial(pk, n)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("dail failed: %w", err)
 	}
 	defer conn.Close()
 
@@ -39,32 +41,32 @@ func getClientInfo(genesis *core.Genesis, networkID uint64, nodeURL string, n *e
 		return nil, fmt.Errorf("cannot set conn deadline: %w", err)
 	}
 
-	if err = writeHello(conn, sk); err != nil {
-		return nil, err
+	if err = writeHello(conn, pk); err != nil {
+		return nil, fmt.Errorf("write hello failed: %w", err)
 	}
 	if err = readHello(conn, &info); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read hello failed: %w", err)
 	}
 
 	// If node provides no eth version, we can skip it.
 	if conn.negotiatedProtoVersion == 0 {
-		return &info, nil
+		return nil, ErrNotEthNode
 	}
 
 	if err = conn.SetDeadline(time.Now().Add(15 * time.Second)); err != nil {
-		return nil, fmt.Errorf("cannot set conn deadline: %w", err)
+		return nil, fmt.Errorf("set conn deadline failed: %w", err)
 	}
 
 	s := getStatus(genesis.Config, uint32(conn.negotiatedProtoVersion), genesis.ToBlock(), networkID, nodeURL)
 	if err = conn.Write(s); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get status failed: %w", err)
 	}
 
 	// Regardless of whether we wrote a status message or not, the remote side
 	// might still send us one.
 
 	if err = readStatus(conn, &info); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read status failed: %w", err)
 	}
 
 	// Disconnect from client
@@ -74,31 +76,28 @@ func getClientInfo(genesis *core.Genesis, networkID uint64, nodeURL string, n *e
 }
 
 // dial attempts to dial the given node and perform a handshake,
-func dial(n *enode.Node) (*Conn, *ecdsa.PrivateKey, error) {
+func dial(pk *ecdsa.PrivateKey, n *enode.Node) (*Conn, error) {
 	var conn Conn
 
 	// dial
 	dialer := net.Dialer{Timeout: 10 * time.Second}
 	fd, err := dialer.Dial("tcp", fmt.Sprintf("%v:%d", n.IP(), n.TCP()))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	conn.Conn = rlpx.NewConn(fd, n.Pubkey())
 
 	if err = conn.SetDeadline(time.Now().Add(15 * time.Second)); err != nil {
-		return nil, nil, fmt.Errorf("cannot set conn deadline: %w", err)
+		return nil, fmt.Errorf("cannot set conn deadline: %w", err)
 	}
 
-	// do encHandshake
-	ourKey, _ := crypto.GenerateKey()
-
-	_, err = conn.Handshake(ourKey)
+	_, err = conn.Handshake(pk)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return &conn, ourKey, nil
+	return &conn, nil
 }
 
 func writeHello(conn *Conn, priv *ecdsa.PrivateKey) error {
@@ -129,8 +128,8 @@ func readHello(conn *Conn, info *common.ClientInfo) error {
 			conn.SetSnappy(true)
 		}
 		info.Capabilities = msg.Caps
-		info.SoftwareVersion = msg.Version
-		info.ClientType = msg.Name
+		info.RLPxVersion = msg.Version
+		info.ClientName = msg.Name
 
 		conn.negotiateEthProtocol(info.Capabilities)
 
@@ -182,12 +181,17 @@ func readStatus(conn *Conn, info *common.ClientInfo) error {
 		info.ForkID = msg.ForkID
 		info.HeadHash = msg.Head
 		info.NetworkID = msg.NetworkID
-		// m.ProtocolVersion
-		info.TotalDifficulty = msg.TD
 		// Set correct TD if received TD is higher
 		if msg.TD.Cmp(_status.TD) > 0 {
 			_status.TD = msg.TD
 		}
+	case *Ping:
+		err := conn.Write(Pong{})
+		if err != nil {
+			return fmt.Errorf("write pong failed: %w", err)
+		}
+
+		return readStatus(conn, info)
 	case *Disconnect:
 		return fmt.Errorf("bad status handshake disconnect: %v", msg.Reason.Error())
 	case *Error:

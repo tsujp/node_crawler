@@ -36,11 +36,15 @@
             src = ./.;
             subPackages = [ "cmd/crawler" ];
 
-            vendorHash = "sha256-ePAqlIcHShhJMgviPCVPyt5SeUCpQCtJdE6IziOJqlo=";
+            vendorHash = "sha256-CkcdkPHqo+nIUERu0T0kyIDjHJ4CUPq4oJCN4X6dfQA=";
 
             doCheck = false;
 
             CGO_ENABLED = 0;
+
+            preBuild = ''
+              ${templ.packages.${system}.default}/bin/templ generate
+            '';
 
             ldflags = [
               "-s"
@@ -174,27 +178,27 @@
 
               geoipdb = mkOption {
                 type = types.path;
-                default = config.services.geoipupdate.settings.DatabaseDirectory + "/GeoLite2-Country.mmdb";
+                default = config.services.geoipupdate.settings.DatabaseDirectory + "/GeoLite2-City.mmdb";
                 description = ''
                   Location of the GeoIP database.
 
                   If the default is used, the `geoipupdate` service files.
                   So you will need to configure it.
-                  Make sure to enable the `GeoLite2-Country` edition.
+                  Make sure to enable the `GeoLite2-City` edition.
 
                   If you do not want to enable the `geoipupdate` service, then
-                  the `GeoLite2-Country` file needs to be provided.
+                  the `GeoLite2-City` file needs to be provided.
                 '';
               };
 
-              network = {
+              network = mkOption {
                 type = types.str;
                 default = "mainnet";
                 example = "holesky";
                 description = "Name of the network to crawl. Defaults to Mainnet.";
               };
 
-              v1 = {
+              v1 = mkOption {
                 type = types.bool;
                 default = true;
               };
@@ -275,6 +279,9 @@
                     };
                     "/v1/" = {
                       proxyPass = "http://nodeCrawlerApi/v1/";
+                    };
+                    "/nodes" = {
+                      proxyPass = "http://nodeCrawlerApi/nodes";
                     };
                   };
                 }

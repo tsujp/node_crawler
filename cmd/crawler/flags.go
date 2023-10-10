@@ -33,7 +33,7 @@ var (
 		Name: "busy-timeout",
 		Usage: ("Sets the busy_timeout value for the database in milliseconds. " +
 			"https://www.sqlite.org/pragma.html#pragma_busy_timeout"),
-		Value: 30000,
+		Value: 3000,
 	}
 	crawlerDBFlag = cli.StringFlag{
 		Name:     "crawler-db",
@@ -62,9 +62,10 @@ var (
 		Name:  "nodefile",
 		Usage: "Path to a node file containing nodes to be crawled",
 	}
-	nodekeyFlag = cli.StringFlag{
+	nodeKeyFileFlag = cli.StringFlag{
 		Name:  "nodekey",
-		Usage: "Hex-encoded node key",
+		Usage: "P2P node key file",
+		Value: "node.key",
 	}
 	nodeURLFlag = cli.StringFlag{
 		Name:  "nodeURL",

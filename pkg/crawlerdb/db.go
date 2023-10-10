@@ -42,7 +42,6 @@ func UpdateNodes(db *sql.DB, geoipDB *geoip2.Reader, nodes []common.NodeJSON) er
 			NetworkID,
 			ForkID,
 			Blockheight,
-			TotalDifficulty,
 			HeadHash,
 			IP,
 			Country,
@@ -53,7 +52,7 @@ func UpdateNodes(db *sql.DB, geoipDB *geoip2.Reader, nodes []common.NodeJSON) er
 			Seq,
 			Score,
 			ConnType
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	)
 	if err != nil {
 		return err
@@ -66,9 +65,6 @@ func UpdateNodes(db *sql.DB, geoipDB *geoip2.Reader, nodes []common.NodeJSON) er
 			info = n.Info
 		}
 
-		if info.ClientType == "" && n.TooManyPeers {
-			info.ClientType = "tmp"
-		}
 		connType := ""
 		var portUDP enr.UDP
 		if n.N.Load(&portUDP) == nil {
@@ -82,7 +78,7 @@ func UpdateNodes(db *sql.DB, geoipDB *geoip2.Reader, nodes []common.NodeJSON) er
 
 		var eth2 ETH2
 		if n.N.Load(&eth2) == nil {
-			info.ClientType = "eth2"
+			info.ClientName = "eth2"
 			var dat beacon.Eth2Data
 			err = dat.Deserialize(codec.NewDecodingReader(bytes.NewReader(eth2), uint64(len(eth2))))
 			if err == nil {
@@ -114,14 +110,13 @@ func UpdateNodes(db *sql.DB, geoipDB *geoip2.Reader, nodes []common.NodeJSON) er
 		_, err = stmt.Exec(
 			n.N.ID().String(),
 			now.String(),
-			info.ClientType,
+			info.ClientName,
 			pk,
-			info.SoftwareVersion,
+			info.RLPxVersion,
 			caps,
 			info.NetworkID,
 			fid,
 			info.Blockheight,
-			info.TotalDifficulty.String(),
 			info.HeadHash.String(),
 			n.N.IP().String(),
 			country,
@@ -164,8 +159,10 @@ func CreateDB(db *sql.DB) error {
 		Seq             NUMBER,
 		Score           NUMBER,
 		ConnType        TEXT,
+
 		PRIMARY KEY (ID, Now)
 	);
+
 	DELETE FROM nodes;
 	`
 	_, err := db.Exec(sqlStmt)

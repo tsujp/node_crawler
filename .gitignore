@@ -16,11 +16,16 @@ build
 
 npm-debug.log*
 
-nodetable
-nodes
-node-crawler-backend.exe
-node-crawler-backend
+# application
 /data/
+api.db*
+crawler.db*
+node-crawler-backend
+node-crawler-backend.exe
+node.key
+nodes
+nodetable
+public/*_templ.go
 
 # nix
 result

@@ -17,10 +17,13 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
-	"time"
+	"strings"
 
 	_ "modernc.org/sqlite"
 
@@ -28,11 +31,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/crawler"
 	"github.com/ethereum/node-crawler/pkg/crawlerdb"
+	"github.com/ethereum/node-crawler/pkg/crawlerv2"
 	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/ethereum/node-crawler/pkg/disc"
 
@@ -54,7 +60,7 @@ var (
 			&nodeFileFlag,
 			&nodeURLFlag,
 			&nodedbFlag,
-			&nodekeyFlag,
+			&nodeKeyFileFlag,
 			&timeoutFlag,
 			&v1Flag,
 			&workersFlag,
@@ -88,41 +94,111 @@ func initDB(dbName string, autovacuum string, busyTimeout uint64) (*sql.DB, erro
 	return db, nil
 }
 
+func readNodeKey(cCtx *cli.Context) (*ecdsa.PrivateKey, error) {
+	nodeKey, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, fmt.Errorf("generating node key failed: %w", err)
+	}
+
+	nodeKeyFileName := nodeKeyFileFlag.Get(cCtx)
+
+	nodeKeyFile, err := os.ReadFile(nodeKeyFileName)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			nodeKeyString := hex.EncodeToString(crypto.FromECDSA(nodeKey))
+
+			err = os.WriteFile(nodeKeyFileName, []byte(nodeKeyString), 0o600)
+			if err != nil {
+				return nil, fmt.Errorf("writing new node file failed: %w", err)
+			}
+
+			return nodeKey, nil
+		}
+
+		return nil, fmt.Errorf("reading node key file failed: %w", err)
+	}
+
+	nodeKeyBytes, err := hex.DecodeString(strings.TrimSpace(string(nodeKeyFile)))
+	if err != nil {
+		return nil, fmt.Errorf("hex decoding node key failed: %w", err)
+	}
+
+	nodeKey, err = crypto.ToECDSA(nodeKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("ecdsa parsing of node key failed: %w", err)
+	}
+
+	return nodeKey, nil
+}
+
 func crawlNodesV2(cCtx *cli.Context) error {
-	if cCtx.Bool(v1Flag.Name) {
+	if v1Flag.Get(cCtx) {
 		go crawlNodes(cCtx)
 	}
 
-	db, err := initDB(
-		cCtx.String(crawlerDBFlag.Name)+"_v2",
-		cCtx.String(autovacuumFlag.Name),
-		cCtx.Uint64(busyTimeoutFlag.Name),
+	sqlite, err := initDB(
+		crawlerDBFlag.Get(cCtx)+"_v2",
+		autovacuumFlag.Get(cCtx),
+		busyTimeoutFlag.Get(cCtx),
 	)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("init db failed: %w", err)
 	}
-	defer db.Close()
+	defer sqlite.Close()
 
-	discDB := database.NewDiscDB(db)
+	geoipFile := geoipdbFlag.Get(cCtx)
+	var geoipDB *geoip2.Reader
 
-	err = discDB.CreateTables()
+	if geoipFile != "" {
+		geoipDB, err = geoip2.Open(geoipFile)
+		if err != nil {
+			return fmt.Errorf("opening geoip database failed: %w", err)
+		}
+		defer func() { _ = geoipDB.Close() }()
+	}
+
+	db := database.NewDB(sqlite, geoipDB)
+
+	err = db.CreateTables()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("create tables failed: %w", err)
 	}
 
-	disc, err := disc.New(discDB, cCtx.String(listenAddrFlag.Name))
+	nodeKey, err := readNodeKey(cCtx)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("node key failed: %w", err)
 	}
+
+	disc, err := disc.New(db, listenAddrFlag.Get(cCtx), nodeKey)
+	if err != nil {
+		return fmt.Errorf("create disc failed: %w", err)
+	}
+	defer disc.Close()
 
 	err = disc.StartDaemon()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("start disc daemon failed: %w", err)
 	}
 
-	for {
-		time.Sleep(time.Hour)
+	crawler, err := crawlerv2.NewCrawlerV2(
+		db,
+		nodeKey,
+		core.DefaultGenesisBlock(),
+		utils.NetworkIdFlag.Get(cCtx),
+	)
+	if err != nil {
+		return fmt.Errorf("create crawler v2 failed: %w", err)
 	}
+
+	err = crawler.StartDaemon()
+	if err != nil {
+		return fmt.Errorf("start crawler v2 failed: %w", err)
+	}
+
+	disc.Wait()
+	crawler.Wait()
+
+	return nil
 }
 
 func crawlNodes(ctx *cli.Context) error {
@@ -162,11 +238,16 @@ func crawlNodes(ctx *cli.Context) error {
 		defer func() { _ = geoipDB.Close() }()
 	}
 
+	nodeKey, err := readNodeKey(ctx)
+	if err != nil {
+		return fmt.Errorf("loading node key failed: %w", err)
+	}
+
 	crawler := crawler.Crawler{
 		NetworkID:  ctx.Uint64(utils.NetworkIdFlag.Name),
 		NodeURL:    ctx.String(nodeURLFlag.Name),
 		ListenAddr: ctx.String(listenAddrFlag.Name),
-		NodeKey:    ctx.String(nodekeyFlag.Name),
+		NodeKey:    nodeKey,
 		Bootnodes:  ctx.StringSlice(bootnodesFlag.Name),
 		Timeout:    ctx.Duration(timeoutFlag.Name),
 		Workers:    ctx.Uint64(workersFlag.Name),

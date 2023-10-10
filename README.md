@@ -93,9 +93,9 @@ go run ./cmd/crawler
 - golang
 - sqlite3
 
-##### Country location
+##### City location
 
-- `GeoLite2-Country.mmdb` file from [https://dev.maxmind.com/geoip/geolite2-free-geolocation-data?lang=en](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data?lang=en)
+- `GeoLite2-City.mmdb` file from [https://dev.maxmind.com/geoip/geolite2-free-geolocation-data?lang=en](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data?lang=en)
   - you will have to create an account to get access to this file
 
 #### Development
@@ -119,7 +119,7 @@ go build ./cmd/crawler -o /usr/bin/node-crawler
 ```
 
 Create a systemd service similarly to above API example. In executed command, override default settings by pointing crawler database to chosen path and setting period to write crawled nodes.
-If you want to get the country that a Node is in you have to specify the location the geoIP database as well.
+If you want to get the city that a Node is in you have to specify the location the geoIP database as well.
 
 ##### No GeoIP
 
@@ -130,7 +130,7 @@ node-crawler crawl --timeout 10m --crawler-db /path/to/database
 ##### With GeoIP
 
 ```
-node-crawler crawl --timeout 10m --crawler /path/to/database --geoipdb GeoLite2-Country.mmdb
+node-crawler crawl --timeout 10m --crawler /path/to/database --geoipdb GeoLite2-City.mmdb
 ```
 
 ### Docker setup
@@ -246,13 +246,13 @@ Your example `configuration.nix`:
       };
     };
 
-    # Needed for the node crawler to get the country
+    # Needed for the node crawler to get the city
     # of the crawled IP address.
     geoipupdate = {
       enable = true;
       settings = {
         EditionIDs = [
-          "GeoLite2-Country"
+          "GeoLite2-City"
         ];
         AccountID = account_id;
         LicenseKey = "location of licence key on server";

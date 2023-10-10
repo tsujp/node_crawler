@@ -8,18 +8,15 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/node-crawler/pkg/common"
 )
 
 func (c Crawler) makeDiscoveryConfig() (*enode.LocalNode, discover.Config) {
 	var cfg discover.Config
 	var err error
 
-	if c.NodeKey != "" {
-		key, err := crypto.HexToECDSA(c.NodeKey)
-		if err != nil {
-			panic(fmt.Errorf("-%s: %v", c.NodeKey, err))
-		}
-		cfg.PrivateKey = key
+	if c.NodeKey != nil {
+		cfg.PrivateKey = c.NodeKey
 	} else {
 		cfg.PrivateKey, _ = crypto.GenerateKey()
 	}
@@ -57,7 +54,7 @@ func (c Crawler) parseBootnodes() ([]*enode.Node, error) {
 	nodes := make([]*enode.Node, len(bootnodes))
 	var err error
 	for i, record := range bootnodes {
-		nodes[i], err = parseNode(record)
+		nodes[i], err = common.ParseNode(record)
 		if err != nil {
 			return nil, fmt.Errorf("invalid bootstrap node: %v", err)
 		}

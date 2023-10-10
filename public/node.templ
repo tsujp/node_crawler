@@ -1,0 +1,200 @@
+package public
+
+import "github.com/ethereum/node-crawler/pkg/database"
+import "strconv"
+import "fmt"
+
+templ NodeTable(nt database.NodeTable) {
+	<div>
+		<table style="max-width=100%">
+			<tbody>
+				<tr>
+					<td>ID</td>
+					<td>{ nt.ID }</td>
+				</tr>
+				<tr>
+					<td>Client Name</td>
+					<td>{ nt.ClientName }</td>
+				</tr>
+				<tr>
+					<td>Last Update</td>
+					<td>{ nt.SinceUpdate() } ago ({ nt.UpdatedAt })</td>
+				</tr>
+				<tr>
+					<td>Enode</td>
+					<td>{ nt.Enode }</td>
+				</tr>
+				<tr>
+					<td>RLPx Version</td>
+					<td>{ nt.RlpxVersion }</td>
+				</tr>
+				<tr>
+					<td>Capabilities</td>
+					<td>{ nt.Capabilities }</td>
+				</tr>
+				<tr>
+					<td>Network ID</td>
+					if nt.NetworkID == -1 {
+						<td></td>
+					} else {
+						<td>{ nt.NetworkName() } ({ strconv.Itoa(nt.NetworkID) })</td>
+					}
+				</tr>
+				<tr>
+					<td>Fork ID</td>
+					<td>{ nt.ForkID }</td>
+				</tr>
+				<tr>
+					<td>Next Fork ID</td>
+					<td>{ nt.NextForkID }</td>
+				</tr>
+				<tr>
+					<td>Block Height</td>
+					<td>{ nt.BlockHeight }</td>
+				</tr>
+				<tr>
+					<td>Sequence</td>
+					<td>{ nt.Sequence }</td>
+				</tr>
+				<tr>
+					<td>IP Address</td>
+					<td>{ nt.IP }</td>
+				</tr>
+				<tr>
+					<td>Connection Type</td>
+					<td>{ nt.ConnectionType }</td>
+				</tr>
+				<tr>
+					<td>Country</td>
+					<td>{ nt.Country }</td>
+				</tr>
+				<tr>
+					<td>City</td>
+					<td>{ nt.City }</td>
+				</tr>
+			</tbody>
+		</table>
+		<div style="position: relative; width: max-content;">
+			<image width="800px" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Blue_Marble_2002.png/1280px-Blue_Marble_2002.png"></image>
+			<image style="REPLACE_THIS_ETH_LOGO" height="10%" src="https://ethereum.org/static/2aba39d4e25d90caabb0c85a58c6aba9/f41b0/eth-glyph-colored.png"></image>
+		</div>
+	</div>
+}
+
+templ NodeList(nodes database.NodeList) {
+	<div style="display:flex;flex-direction:row;justify-content:center">
+		<div style="width:max-content">
+			<h3>Nodes</h3>
+			<table style="width:100%">
+				<thead>
+					<tr>
+						<td>Node ID</td>
+						<td>Client Name</td>
+						<td>Last Update</td>
+						<td>Country</td>
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range nodes.List {
+						<tr>
+							<td><a href={ templ.URL("/nodes/" + row.ID) }>{ row.ID[:8] }</a></td>
+							<td>{ row.ClientName }</td>
+							<td title={ row.UpdatedAt }>{ row.SinceUpdate() } ago</td>
+							<td>{ row.Country }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<div style="display:flex;flex-direction:row;justify-content:space-between;align-items:center;gap:2em">
+				<span>
+					{ strconv.Itoa(nodes.Offset+1) }
+					to
+					{ strconv.Itoa(min(nodes.Offset+nodes.PageSize+1, nodes.Total)) }
+					of
+					{ strconv.Itoa(nodes.Total) }
+					Nodes
+				</span>
+				<div style="display:flex;flex-direction:row;align-items:center">
+					if nodes.PageNumber > 6 {
+						@pageNumberButton(1, false)
+						@spacer()
+					}
+					for i := startPage(nodes.PageNumber, nodes.NPages()); i <= endPage(nodes.PageNumber, nodes.NPages()); i++ {
+						@pageNumberButton(i, i == nodes.PageNumber)
+					}
+					if nodes.PageNumber < nodes.NPages() - 4 {
+						@spacer()
+						@pageNumberButton(nodes.NPages(), false)
+					}
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+func startPage(pageNum int, totalPages int) int {
+	if pageNum < 7 {
+		return 1
+	}
+
+	if pageNum > totalPages-5 {
+		return totalPages - 8
+	}
+
+	return pageNum - 3
+}
+
+func endPage(pageNum int, totalPages int) int {
+	if pageNum < 6 {
+		return 9
+	}
+
+	if pageNum > totalPages-5 {
+		return totalPages
+	}
+
+	return pageNum + 3
+}
+
+templ spacer() {
+	<div style="padding:0.5em 1em">
+		<span>...</span>
+	</div>
+}
+
+templ pageNumberButton(pageNumber int, isPage bool) {
+	if isPage {
+		<div style="margin:0.1em;padding:0.5em 1em;border-radius: 0.2em;border:1px solid orange;">
+			<a href={ templ.URL(fmt.Sprintf("/nodes?page=%d", pageNumber)) }>{ strconv.Itoa(pageNumber) }</a>
+		</div>
+	} else {
+		<div style="margin:0.1em;padding:0.5em 1em;border-radius:0.2em;border:1px solid #eee;">
+			<a href={ templ.URL(fmt.Sprintf("/nodes?page=%d", pageNumber)) }>{ strconv.Itoa(pageNumber) }</a>
+		</div>
+	}
+}
+
+templ Index(main templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en-US">
+		<head>
+			<script src="https://unpkg.com/htmx.org@1.9.6"></script>
+			<title>Node Crawler</title>
+			<style type="text/css">
+				td {
+					padding: 0.5em 1em;
+					word-break: break-all;
+				}
+				td:first-child {
+					white-space: nowrap;
+				}
+				tr:nth-of-type(even) {
+					background-color: #ddd;
+				}
+			</style>
+		</head>
+		<body>
+			{! main }
+		</body>
+	</html>
+}

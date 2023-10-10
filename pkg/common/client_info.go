@@ -9,8 +9,8 @@ import (
 )
 
 type ClientInfo struct {
-	ClientType      string
-	SoftwareVersion uint64
+	ClientName      string
+	RLPxVersion     uint64
 	Capabilities    []p2p.Cap
 	NetworkID       uint64
 	ForkID          forkid.ID

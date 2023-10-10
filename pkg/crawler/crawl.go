@@ -17,8 +17,8 @@
 package crawler
 
 import (
+	"crypto/ecdsa"
 	"database/sql"
-	"strings"
 	"sync"
 	"time"
 
@@ -36,7 +36,7 @@ type Crawler struct {
 	NetworkID  uint64
 	NodeURL    string
 	ListenAddr string
-	NodeKey    string
+	NodeKey    *ecdsa.PrivateKey
 	Bootnodes  []string
 	Timeout    time.Duration
 	Workers    uint64
@@ -50,6 +50,7 @@ type Crawler struct {
 type crawler struct {
 	output common.NodeSet
 
+	nodeKey   *ecdsa.PrivateKey
 	genesis   *core.Genesis
 	networkID uint64
 	nodeURL   string
@@ -78,6 +79,7 @@ type resolver interface {
 }
 
 func NewCrawler(
+	nodeKey *ecdsa.PrivateKey,
 	genesis *core.Genesis,
 	networkID uint64,
 	nodeURL string,
@@ -88,6 +90,7 @@ func NewCrawler(
 ) *crawler {
 	c := &crawler{
 		output:    make(common.NodeSet, len(input)),
+		nodeKey:   nodeKey,
 		genesis:   genesis,
 		networkID: networkID,
 		nodeURL:   nodeURL,
@@ -181,32 +184,27 @@ func (c *crawler) getClientInfoLoop() {
 			return
 		}
 
-		var tooManyPeers bool
 		var scoreInc int
 
-		info, err := getClientInfo(c.genesis, c.networkID, c.nodeURL, n)
+		info, err := GetClientInfo(c.nodeKey, c.genesis, c.networkID, c.nodeURL, n)
 		if err != nil {
-			log.Warn("GetClientInfo failed", "error", err, "nodeID", n.ID())
-			if strings.Contains(err.Error(), "too many peers") {
-				tooManyPeers = true
-			}
+			// log.Warn("GetClientInfo failed", "error", err, "nodeID", n.ID())
 		} else {
 			scoreInc = 10
 		}
 
-		if info != nil {
-			log.Info(
-				"Updating node info",
-				"client_type", info.ClientType,
-				"version", info.SoftwareVersion,
-				"network_id", info.NetworkID,
-				"caps", info.Capabilities,
-				"fork_id", info.ForkID,
-				"height", info.Blockheight,
-				"td", info.TotalDifficulty,
-				"head", info.HeadHash,
-			)
-		}
+		// if info != nil {
+		// 	log.Info(
+		// 		"Updating node info",
+		// 		"client_type", info.ClientName,
+		// 		"version", info.RLPxVersion,
+		// 		"network_id", info.NetworkID,
+		// 		"caps", info.Capabilities,
+		// 		"fork_id", info.ForkID,
+		// 		"height", info.Blockheight,
+		// 		"head", info.HeadHash,
+		// 	)
+		// }
 
 		c.Lock()
 		node := c.output[n.ID()]
@@ -215,7 +213,6 @@ func (c *crawler) getClientInfoLoop() {
 		if info != nil {
 			node.Info = info
 		}
-		node.TooManyPeers = tooManyPeers
 		node.Score += scoreInc
 		c.output[n.ID()] = node
 		c.Unlock()
@@ -229,7 +226,7 @@ func (c *crawler) updateNode(n *enode.Node) {
 	node, ok := c.output[n.ID()]
 
 	// Skip validation of recently-seen nodes.
-	if ok && !node.TooManyPeers && time.Since(node.LastCheck) < c.revalidateInterval {
+	if ok && time.Since(node.LastCheck) < c.revalidateInterval {
 		return
 	}
 
@@ -259,7 +256,7 @@ func (c *crawler) updateNode(n *enode.Node) {
 		log.Info("Removing node", "id", n.ID())
 		delete(c.output, n.ID())
 	} else {
-		log.Info("Updating node", "id", n.ID(), "seq", n.Seq(), "score", node.Score)
+		// log.Info("Updating node", "id", n.ID(), "seq", n.Seq(), "score", node.Score)
 		c.reqCh <- n
 		c.output[n.ID()] = node
 	}
@@ -345,7 +342,7 @@ func (c Crawler) runCrawler(disc resolver, inputSet common.NodeSet) common.NodeS
 		genesis = core.DefaultGenesisBlock()
 	}
 
-	crawler := NewCrawler(genesis, c.NetworkID, c.NodeURL, inputSet, c.Workers, disc, disc.RandomNodes())
+	crawler := NewCrawler(c.NodeKey, genesis, c.NetworkID, c.NodeURL, inputSet, c.Workers, disc, disc.RandomNodes())
 	crawler.revalidateInterval = 10 * time.Minute
 	return crawler.Run(c.Timeout)
 }

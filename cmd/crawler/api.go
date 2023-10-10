@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/node-crawler/pkg/api"
 	"github.com/ethereum/node-crawler/pkg/apidb"
 	"github.com/ethereum/node-crawler/pkg/crawlerdb"
+	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/urfave/cli/v2"
 )
 
@@ -64,6 +65,19 @@ func startAPI(ctx *cli.Context) error {
 			return err
 		}
 	}
+
+	sqlite, err := initDB(
+		crawlerDBFlag.Get(ctx)+"_v2",
+		autovacuumFlag.Get(ctx),
+		busyTimeoutFlag.Get(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("init db failed: %w", err)
+	}
+	defer sqlite.Close()
+
+	dbv2 := database.NewDB(sqlite, nil)
+
 	var wg sync.WaitGroup
 	wg.Add(3)
 
@@ -73,7 +87,7 @@ func startAPI(ctx *cli.Context) error {
 
 	// Start the API deamon
 	apiAddress := ctx.String(apiListenAddrFlag.Name)
-	apiDeamon := api.New(apiAddress, nodeDB)
+	apiDeamon := api.New(apiAddress, nodeDB, dbv2)
 	go apiDeamon.HandleRequests(&wg)
 	wg.Wait()
 

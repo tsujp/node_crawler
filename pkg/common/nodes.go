@@ -22,10 +22,12 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 )
 
 const jsonIndent = "    "
@@ -49,7 +51,46 @@ type NodeJSON struct {
 
 	Info *ClientInfo `json:"clientInfo,omitempty"`
 
-	TooManyPeers bool `json:"tooManyPeers,omitempty"`
+	Error   string
+	EthNode bool
+}
+
+func (n *NodeJSON) ID() string {
+	return n.N.ID().String()
+}
+
+func (n *NodeJSON) ConnectionType() string {
+	connType := ""
+
+	var portUDP enr.UDP
+	if n.N.Load(&portUDP) == nil {
+		connType = "UDP"
+	}
+
+	var portTCP enr.TCP
+	if n.N.Load(&portTCP) == nil {
+		connType = "TCP"
+	}
+
+	return connType
+}
+
+func (n *NodeJSON) GetInfo() ClientInfo {
+	if n.Info == nil {
+		return ClientInfo{}
+	}
+
+	return *n.Info
+}
+
+func (n *NodeJSON) CapsString() string {
+	caps := []string{}
+
+	for _, cap := range n.GetInfo().Capabilities {
+		caps = append(caps, cap.String())
+	}
+
+	return strings.Join(caps, ", ")
 }
 
 func LoadNodesJSON(file string) NodeSet {
