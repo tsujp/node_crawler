@@ -5,9 +5,10 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     devshell.url = "github:numtide/devshell";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    templ.url = "github:a-h/templ";
   };
 
-  outputs = inputs@{ self, nixpkgs, devshell, flake-parts }:
+  outputs = inputs@{ self, nixpkgs, devshell, flake-parts, templ }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         devshell.flakeModule
@@ -21,7 +22,7 @@
         "aarch64-darwin"
       ];
 
-      perSystem = { config, pkgs, final, ... }: {
+      perSystem = { config, pkgs, final, system, ... }: {
         overlayAttrs = {
           inherit (config.packages) nodeCrawler;
           inherit (config.packages) nodeCrawlerFrontend;
@@ -68,6 +69,7 @@
             golangci-lint
             nodejs
             sqlite
+            templ.packages.${system}.default
           ];
         };
       };
