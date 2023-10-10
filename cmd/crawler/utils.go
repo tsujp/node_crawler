@@ -22,6 +22,10 @@ func openSQLiteDB(
 	if err != nil {
 		return nil, fmt.Errorf("error setting busy_timeout: %w", err)
 	}
+	_, err = db.Exec("PRAGMA journal_mode = WAL")
+	if err != nil {
+		return nil, fmt.Errorf("error setting journal_mode = WAL: %w", err)
+	}
 
 	return db, nil
 }

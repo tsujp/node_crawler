@@ -18,7 +18,9 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -31,6 +33,8 @@ import (
 	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/crawler"
 	"github.com/ethereum/node-crawler/pkg/crawlerdb"
+	"github.com/ethereum/node-crawler/pkg/database"
+	"github.com/ethereum/node-crawler/pkg/disc"
 
 	"github.com/urfave/cli/v2"
 )
@@ -39,7 +43,7 @@ var (
 	crawlerCommand = &cli.Command{
 		Name:   "crawl",
 		Usage:  "Crawl the ethereum network",
-		Action: crawlNodes,
+		Action: crawlNodesV2,
 		Flags: []cli.Flag{
 			&autovacuumFlag,
 			&bootnodesFlag,
@@ -52,6 +56,7 @@ var (
 			&nodedbFlag,
 			&nodekeyFlag,
 			&timeoutFlag,
+			&v1Flag,
 			&workersFlag,
 			utils.GoerliFlag,
 			utils.HoleskyFlag,
@@ -61,9 +66,70 @@ var (
 	}
 )
 
+func initDB(dbName string, autovacuum string, busyTimeout uint64) (*sql.DB, error) {
+	shouldInit := false
+	if _, err := os.Stat(dbName); os.IsNotExist(err) {
+		shouldInit = true
+	}
+
+	db, err := openSQLiteDB(dbName, autovacuum, busyTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("opening database failed: %w", err)
+	}
+
+	log.Info("Connected to db")
+	if shouldInit {
+		log.Info("DB did not exist, init")
+		if err := crawlerdb.CreateDB(db); err != nil {
+			return nil, fmt.Errorf("init database failed: %w", err)
+		}
+	}
+
+	return db, nil
+}
+
+func crawlNodesV2(cCtx *cli.Context) error {
+	if cCtx.Bool(v1Flag.Name) {
+		go crawlNodes(cCtx)
+	}
+
+	db, err := initDB(
+		cCtx.String(crawlerDBFlag.Name)+"_v2",
+		cCtx.String(autovacuumFlag.Name),
+		cCtx.Uint64(busyTimeoutFlag.Name),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	discDB := database.NewDiscDB(db)
+
+	err = discDB.CreateTables()
+	if err != nil {
+		panic(err)
+	}
+
+	disc, err := disc.New(discDB, cCtx.String(listenAddrFlag.Name))
+	if err != nil {
+		panic(err)
+	}
+
+	err = disc.StartDaemon()
+	if err != nil {
+		panic(err)
+	}
+
+	for {
+		time.Sleep(time.Hour)
+	}
+}
+
 func crawlNodes(ctx *cli.Context) error {
 	var inputSet common.NodeSet
 	var geoipDB *geoip2.Reader
+	var db *sql.DB
+	var err error
 
 	nodesFile := ctx.String(nodeFileFlag.Name)
 
@@ -71,29 +137,14 @@ func crawlNodes(ctx *cli.Context) error {
 		inputSet = common.LoadNodesJSON(nodesFile)
 	}
 
-	var db *sql.DB
 	if ctx.IsSet(crawlerDBFlag.Name) {
-		name := ctx.String(crawlerDBFlag.Name)
-		shouldInit := false
-		if _, err := os.Stat(name); os.IsNotExist(err) {
-			shouldInit = true
-		}
-		var err error
-
-		db, err = openSQLiteDB(
-			name,
+		db, err = initDB(
+			ctx.String(crawlerDBFlag.Name),
 			ctx.String(autovacuumFlag.Name),
 			ctx.Uint64(busyTimeoutFlag.Name),
 		)
 		if err != nil {
 			panic(err)
-		}
-		log.Info("Connected to db")
-		if shouldInit {
-			log.Info("DB did not exist, init")
-			if err := crawlerdb.CreateDB(db); err != nil {
-				panic(err)
-			}
 		}
 	}
 
@@ -102,7 +153,8 @@ func crawlNodes(ctx *cli.Context) error {
 		panic(err)
 	}
 
-	if geoipFile := ctx.String(geoipdbFlag.Name); geoipFile != "" {
+	geoipFile := ctx.String(geoipdbFlag.Name)
+	if geoipFile != "" {
 		geoipDB, err = geoip2.Open(geoipFile)
 		if err != nil {
 			return err

@@ -35,7 +35,7 @@
             src = ./.;
             subPackages = [ "cmd/crawler" ];
 
-            vendorHash = "sha256-nR6YsXZvIUupDHGCgOYELDpJVbbPc1SPK9LdwnL5sAQ=";
+            vendorHash = "sha256-ePAqlIcHShhJMgviPCVPyt5SeUCpQCtJdE6IziOJqlo=";
 
             doCheck = false;
 
@@ -191,6 +191,11 @@
                 example = "holesky";
                 description = "Name of the network to crawl. Defaults to Mainnet.";
               };
+
+              v1 = {
+                type = types.bool;
+                default = true;
+              };
             };
           };
 
@@ -210,7 +215,8 @@
                     ]
                     ++ optional (cfg.crawler.network == "goerli") "--goerli"
                     ++ optional (cfg.crawler.network == "holesky") "--holesky"
-                    ++ optional (cfg.crawler.network == "sepolia") "--sepolia";
+                    ++ optional (cfg.crawler.network == "sepolia") "--sepolia"
+                    ++ optional (cfg.crawler.v1 == true) "--v1";
                   in
                   "${pkgs.nodeCrawler}/bin/crawler crawl ${concatStringsSep " " args}";
 

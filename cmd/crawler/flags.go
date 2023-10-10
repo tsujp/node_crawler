@@ -33,7 +33,7 @@ var (
 		Name: "busy-timeout",
 		Usage: ("Sets the busy_timeout value for the database in milliseconds. " +
 			"https://www.sqlite.org/pragma.html#pragma_busy_timeout"),
-		Value: 3000,
+		Value: 30000,
 	}
 	crawlerDBFlag = cli.StringFlag{
 		Name:     "crawler-db",
@@ -75,6 +75,11 @@ var (
 		Name:  "timeout",
 		Usage: "Timeout for the crawling in a round",
 		Value: 5 * time.Minute,
+	}
+	v1Flag = cli.BoolFlag{
+		Name:  "v1",
+		Usage: "Run V1",
+		Value: false,
 	}
 	workersFlag = cli.Uint64Flag{
 		Name:  "workers",
