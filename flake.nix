@@ -5,7 +5,7 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     devshell.url = "github:numtide/devshell";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    templ.url = "github:a-h/templ";
+    templ.url = "github:angaz/templ/flake";
   };
 
   outputs = inputs@{ self, nixpkgs, devshell, flake-parts, templ }:
@@ -22,10 +22,11 @@
         "aarch64-darwin"
       ];
 
-      perSystem = { config, pkgs, final, system, ... }: {
+      perSystem = { config, pkgs, system, ... }: {
         overlayAttrs = {
-          inherit (config.packages) nodeCrawler;
-          inherit (config.packages) nodeCrawlerFrontend;
+          inherit (config.packages)
+            nodeCrawler
+            nodeCrawlerFrontend;
         };
 
         packages = {
@@ -43,7 +44,7 @@
             CGO_ENABLED = 0;
 
             preBuild = ''
-              ${templ.packages.${system}.default}/bin/templ generate
+              ${templ.packages.${system}.templ}/bin/templ generate
             '';
 
             ldflags = [
@@ -73,7 +74,7 @@
             golangci-lint
             nodejs
             sqlite
-            templ.packages.${system}.default
+            templ.packages.${system}.templ
           ];
         };
       };
