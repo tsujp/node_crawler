@@ -164,13 +164,13 @@ templ spacer() {
 
 templ pageNumberButton(pageNumber int, isPage bool) {
 	if isPage {
-		<div style="margin:0.1em;padding:0.5em 1em;border-radius: 0.2em;border:1px solid orange;">
-			<a href={ templ.URL(fmt.Sprintf("/nodes?page=%d", pageNumber)) }>{ strconv.Itoa(pageNumber) }</a>
-		</div>
+		<a href={ templ.URL(fmt.Sprintf("/nodes?page=%d", pageNumber)) } style="margin:0.1em;padding:0.5em 1em;border-radius: 0.2em;border:1px solid orange;">
+			<span>{ strconv.Itoa(pageNumber) }</span>
+		</a>
 	} else {
-		<div style="margin:0.1em;padding:0.5em 1em;border-radius:0.2em;border:1px solid #eee;">
-			<a href={ templ.URL(fmt.Sprintf("/nodes?page=%d", pageNumber)) }>{ strconv.Itoa(pageNumber) }</a>
-		</div>
+		<a href={ templ.URL(fmt.Sprintf("/nodes?page=%d", pageNumber)) } style="margin:0.1em;padding:0.5em 1em;border-radius:0.2em;border:1px solid #eee;">
+			{ strconv.Itoa(pageNumber) }
+		</a>
 	}
 }
 

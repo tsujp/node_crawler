@@ -33,7 +33,8 @@ func (d *DB) CreateTables() error {
 			next_crawl	TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 		);
 
-		CREATE INDEX IF NOT EXISTS id_next_crawl ON discovered_nodes (id, next_crawl);
+		CREATE INDEX IF NOT EXISTS id_next_crawl
+			ON discovered_nodes (id, next_crawl);
 
 		CREATE TABLE IF NOT EXISTS crawled_nodes (
 			id				TEXT		PRIMARY KEY,
@@ -56,7 +57,10 @@ func (d *DB) CreateTables() error {
 			score			INTEGER		DEFAULT NULL
 		);
 
-		CREATE INDEX IF NOT EXISTS id_last_seen ON crawled_nodes (id, updated_at);
+		CREATE INDEX IF NOT EXISTS id_last_seen
+			ON crawled_nodes (id, updated_at);
+		CREATE INDEX IF NOT EXISTS crawled_nodes_network_id
+			ON crawled_nodes (network_id);
 
 		CREATE TABLE IF NOT EXISTS crawl_history (
 			id			TEXT		NOT NULL,
