@@ -62,7 +62,6 @@ var (
 			&nodedbFlag,
 			&nodeKeyFileFlag,
 			&timeoutFlag,
-			&v1Flag,
 			&workersFlag,
 			utils.GoerliFlag,
 			utils.HoleskyFlag,
@@ -132,10 +131,6 @@ func readNodeKey(cCtx *cli.Context) (*ecdsa.PrivateKey, error) {
 }
 
 func crawlNodesV2(cCtx *cli.Context) error {
-	if v1Flag.Get(cCtx) {
-		go crawlNodes(cCtx)
-	}
-
 	sqlite, err := initDB(
 		crawlerDBFlag.Get(cCtx)+"_v2",
 		autovacuumFlag.Get(cCtx),
@@ -185,6 +180,7 @@ func crawlNodesV2(cCtx *cli.Context) error {
 		nodeKey,
 		core.DefaultGenesisBlock(),
 		utils.NetworkIdFlag.Get(cCtx),
+		workersFlag.Get(cCtx),
 	)
 	if err != nil {
 		return fmt.Errorf("create crawler v2 failed: %w", err)

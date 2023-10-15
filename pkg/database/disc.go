@@ -31,6 +31,8 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 				node = excluded.node,
 				ip_address = excluded.ip_address,
 				last_found = CURRENT_TIMESTAMP
+			WHERE
+				node != excluded.node
 		`,
 		node.ID().String(),
 		node.String(),
@@ -84,6 +86,11 @@ func (d *DB) SelectDiscoveredNodeSlice(
 		}
 
 		out = append(out, node)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("rows iteration failed: %w", err)
 	}
 
 	return out, nil

@@ -3,6 +3,7 @@ package crawlerv2
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,7 @@ type CrawlerV2 struct {
 	nodeKey   *ecdsa.PrivateKey
 	genesis   *core.Genesis
 	networkID uint64
+	workers   uint64
 
 	wg *sync.WaitGroup
 }
@@ -43,12 +45,20 @@ func NewCrawlerV2(
 	nodeKey *ecdsa.PrivateKey,
 	genesis *core.Genesis,
 	networkID uint64,
+	workers uint64,
 ) (*CrawlerV2, error) {
 	crawler := &CrawlerV2{
 		db:        db,
 		nodeKey:   nodeKey,
 		genesis:   genesis,
 		networkID: networkID,
+		workers:   workers,
+	}
+
+	switch workers {
+	case 1, 2, 4, 8, 16:
+	default:
+		return nil, fmt.Errorf("num crawlers: %d not in 1,2,4,8,16", workers)
 	}
 
 	crawler.wg = new(sync.WaitGroup)
@@ -114,10 +124,49 @@ func Range4() []Range {
 	return out
 }
 
+func Range2() []Range {
+	return []Range{
+		{
+			start: nodeIDString("0", '0'),
+			end:   nodeIDString("7", 'f'),
+		},
+		{
+			start: nodeIDString("8", '0'),
+			end:   nodeIDString("f", 'f'),
+		},
+	}
+}
+
+func Range1() []Range {
+	return []Range{
+		{
+			start: nodeIDString("0", '0'),
+			end:   nodeIDString("f", 'f'),
+		},
+	}
+}
+
+func RangeN(n uint64) []Range {
+	switch n {
+	case 1:
+		return Range1()
+	case 2:
+		return Range2()
+	case 4:
+		return Range4()
+	case 8:
+		return Range8()
+	case 16:
+		return Range16()
+	default:
+		panic("invalid num crawler range")
+	}
+}
+
 func (c *CrawlerV2) StartDaemon() error {
 	ch := make(chan common.NodeJSON, 64)
 
-	for _, v := range Range4() {
+	for _, v := range RangeN(c.workers) {
 		c.wg.Add(1)
 		go c.sliceCrawler(v.start, v.end, ch)
 	}
@@ -169,6 +218,8 @@ func (c *CrawlerV2) crawlNode(node *enode.Node, ch chan<- common.NodeJSON) {
 			nodeJSON.Error = "EOF"
 		} else if strings.Contains(e, "disconnect requested") {
 			nodeJSON.Error = "disconnect requested"
+		} else if strings.Contains(e, "useless peer") {
+			nodeJSON.Error = "useless peer"
 		} else {
 			log.Info("get client info failed", "node", node.ID().TerminalString(), "err", err)
 			nodeJSON.Error = e

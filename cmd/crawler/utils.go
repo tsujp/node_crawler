@@ -36,7 +36,7 @@ func openSQLiteDB(
 ) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", name)
 	if err != nil {
-		return nil, fmt.Errorf("error opening database: %w", err)
+		return nil, fmt.Errorf("opening database failed: %w", err)
 	}
 
 	err = setPragma(db, "PRAGMA auto_vacuum = "+autovacuum, "")
@@ -46,12 +46,17 @@ func openSQLiteDB(
 
 	err = setPragma(db, fmt.Sprintf("PRAGMA busy_timeout = %d", busyTimeout), fmt.Sprintf("%d", busyTimeout))
 	if err != nil {
-		return nil, fmt.Errorf("error setting busy_timeout: %w", err)
+		return nil, fmt.Errorf("setting busy_timeout failed: %w", err)
 	}
 
 	err = setPragma(db, "PRAGMA journal_mode = WAL", "wal")
 	if err != nil {
-		return nil, fmt.Errorf("error setting journal_mode = WAL: %w", err)
+		return nil, fmt.Errorf("setting journal_mode = WAL failed: %w", err)
+	}
+
+	err = setPragma(db, "PRAGMA synchronous = NORMAL", "")
+	if err != nil {
+		return nil, fmt.Errorf("setting synchronous = NORMAL failed: %w", err)
 	}
 
 	return db, nil

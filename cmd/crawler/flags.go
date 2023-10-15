@@ -52,7 +52,7 @@ var (
 	listenAddrFlag = cli.StringFlag{
 		Name:  "addr",
 		Usage: "Listening address",
-		Value: "0.0.0.0:0",
+		Value: "0.0.0.0:30303",
 	}
 	nodedbFlag = cli.StringFlag{
 		Name:  "nodedb",
@@ -76,11 +76,6 @@ var (
 		Name:  "timeout",
 		Usage: "Timeout for the crawling in a round",
 		Value: 5 * time.Minute,
-	}
-	v1Flag = cli.BoolFlag{
-		Name:  "v1",
-		Usage: "Run V1",
-		Value: false,
 	}
 	workersFlag = cli.Uint64Flag{
 		Name:  "workers",

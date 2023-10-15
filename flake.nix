@@ -199,14 +199,26 @@
                 description = "Name of the network to crawl. Defaults to Mainnet.";
               };
 
-              v1 = mkOption {
+              openFirewall = mkOption {
                 type = types.bool;
                 default = true;
+                description = "Opens the crawler ports.";
+              };
+
+              workers = mkOption {
+                type = types.int;
+                default = 16;
+                description = "Number of crawler workers to start.";
               };
             };
           };
 
           config = mkIf cfg.enable {
+            networking.firewall = mkIf cfg.crawler.openFirewall {
+              allowedUDPPorts = [ 30303 ];
+              allowedTCPPorts = [ 30303 ];
+            };
+
             systemd.services = {
               node-crawler-crawler = {
                 description = "Node Cralwer, the Ethereum Node Crawler.";
@@ -219,11 +231,11 @@
                     args = [
                       "--crawler-db=${cfg.crawlerDatabaseName}"
                       "--geoipdb=${cfg.crawler.geoipdb}"
+                      "--workers=${toString cfg.crawler.workers}"
                     ]
                     ++ optional (cfg.crawler.network == "goerli") "--goerli"
                     ++ optional (cfg.crawler.network == "holesky") "--holesky"
-                    ++ optional (cfg.crawler.network == "sepolia") "--sepolia"
-                    ++ optional (cfg.crawler.v1 == true) "--v1";
+                    ++ optional (cfg.crawler.network == "sepolia") "--sepolia";
                   in
                   "${pkgs.nodeCrawler}/bin/crawler crawl ${concatStringsSep " " args}";
 

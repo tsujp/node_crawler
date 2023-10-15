@@ -92,3 +92,19 @@ func (d *DB) ExecRetryBusy(retry int, query string, args ...any) (sql.Result, er
 
 	return result, err
 }
+
+func (d *DB) QueryRetryBusy(retry int, query string, args ...any) (*sql.Rows, error) {
+	rows, err := d.db.Query(query, args...)
+	if err != nil && retry < 5 && strings.Contains(err.Error(), "database is locked (5) (SQLITE_BUSY)") {
+		// retry 0: 2^0 * 50 + 100 = 150 ms
+		// retry 1: 2^1 * 50 + 100 = 200 ms
+		// retry 2: 2^2 * 50 + 100 = 300 ms
+		// retry 3: 2^3 * 50 + 100 = 500 ms
+		// retry 4: 2^4 * 50 + 100 = 900 ms
+		time.Sleep(time.Duration((math.Pow(2, float64(retry))*50)+100) * time.Millisecond)
+
+		return d.QueryRetryBusy(retry+1, query, args...)
+	}
+
+	return rows, err
+}
