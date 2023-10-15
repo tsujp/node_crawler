@@ -110,35 +110,52 @@ func setQuery(url *url.URL, key, value string) *url.URL {
 
 func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	var pageNumber int
+	var networkID int
 	var err error
 
-	vars := mux.Vars(r)
+	redirectURL := r.URL
+	redirect := false
 
-	pageNumStr, ok := vars["page"]
-	if !ok {
-		w.Header().Add("HX-Replace-Url", setQuery(r.URL, "page", "1").String())
-		w.Header().Add("Location", setQuery(r.URL, "page", "1").String())
-		w.WriteHeader(http.StatusTemporaryRedirect)
+	pageNumStr := r.URL.Query().Get("page")
+	networkIDStr := r.URL.Query().Get("network")
 
-		return
+	if pageNumStr == "" {
+		redirectURL = setQuery(redirectURL, "page", "1")
+		redirect = true
 	} else {
 		pageNumber, err = strconv.Atoi(pageNumStr)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad page number value: %s\n", vars["page"])
+			_, _ = fmt.Fprintf(w, "bad page number value: %s\n", pageNumStr)
 
 			return
 		}
 		if pageNumber < 1 {
-			w.Header().Add("HX-Replace-Url", setQuery(r.URL, "page", "1").String())
-			w.Header().Add("Location", setQuery(r.URL, "page", "1").String())
-			w.WriteHeader(http.StatusTemporaryRedirect)
+			redirectURL = setQuery(redirectURL, "page", "1")
+			redirect = true
+		}
+	}
+	if networkIDStr == "" {
+		redirectURL = setQuery(redirectURL, "network", "1")
+		redirect = true
+	} else {
+		networkID, err = strconv.Atoi(networkIDStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
 
 			return
 		}
 	}
 
-	nodes, err := a.dbv2.GetNodeList(r.Context(), pageNumber)
+	if redirect {
+		w.Header().Add("Location", redirectURL.String())
+		w.WriteHeader(http.StatusTemporaryRedirect)
+
+		return
+	}
+
+	nodes, err := a.dbv2.GetNodeList(r.Context(), pageNumber, networkID)
 	if err != nil {
 		log.Error("get node list failed", "err", err, "pageNumber", pageNumber)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -157,7 +174,6 @@ func (a *Api) HandleRequests(wg *sync.WaitGroup) {
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("Hello")) })
 	router.HandleFunc("/v1/dashboard", a.handleDashboard).Queries("filter", "{filter}")
 	router.HandleFunc("/v1/dashboard", a.handleDashboard)
-	router.HandleFunc("/nodes", a.nodesListHandler).Queries("page", "{page}")
 	router.HandleFunc("/nodes", a.nodesListHandler)
 	router.HandleFunc("/nodes/{id}", a.nodesHandler)
 	log.Info("Starting API", "address", a.address)

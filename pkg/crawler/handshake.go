@@ -31,7 +31,7 @@ var (
 func GetClientInfo(pk *ecdsa.PrivateKey, genesis *core.Genesis, networkID uint64, nodeURL string, n *enode.Node) (*common.ClientInfo, error) {
 	var info common.ClientInfo
 
-	conn, err := dial(pk, n)
+	conn, err := Dial(pk, n)
 	if err != nil {
 		return nil, fmt.Errorf("dail failed: %w", err)
 	}
@@ -41,15 +41,15 @@ func GetClientInfo(pk *ecdsa.PrivateKey, genesis *core.Genesis, networkID uint64
 		return nil, fmt.Errorf("cannot set conn deadline: %w", err)
 	}
 
-	if err = writeHello(conn, pk); err != nil {
+	if err = WriteHello(conn, pk); err != nil {
 		return nil, fmt.Errorf("write hello failed: %w", err)
 	}
-	if err = readHello(conn, &info); err != nil {
+	if err = ReadHello(conn, &info); err != nil {
 		return nil, fmt.Errorf("read hello failed: %w", err)
 	}
 
 	// If node provides no eth version, we can skip it.
-	if conn.negotiatedProtoVersion == 0 {
+	if conn.NegotiatedProtoVersion == 0 {
 		return nil, ErrNotEthNode
 	}
 
@@ -57,7 +57,7 @@ func GetClientInfo(pk *ecdsa.PrivateKey, genesis *core.Genesis, networkID uint64
 		return nil, fmt.Errorf("set conn deadline failed: %w", err)
 	}
 
-	s := getStatus(genesis.Config, uint32(conn.negotiatedProtoVersion), genesis.ToBlock(), networkID, nodeURL)
+	s := getStatus(genesis.Config, uint32(conn.NegotiatedProtoVersion), genesis.ToBlock(), networkID, nodeURL)
 	if err = conn.Write(s); err != nil {
 		return nil, fmt.Errorf("get status failed: %w", err)
 	}
@@ -75,8 +75,25 @@ func GetClientInfo(pk *ecdsa.PrivateKey, genesis *core.Genesis, networkID uint64
 	return &info, nil
 }
 
-// dial attempts to dial the given node and perform a handshake,
-func dial(pk *ecdsa.PrivateKey, n *enode.Node) (*Conn, error) {
+func Accept(pk *ecdsa.PrivateKey, fd net.Conn) (*ecdsa.PublicKey, *Conn, error) {
+	conn := new(Conn)
+
+	conn.Conn = rlpx.NewConn(fd, nil)
+
+	if err := conn.SetDeadline(time.Now().Add(15 * time.Second)); err != nil {
+		return nil, nil, fmt.Errorf("cannot set conn deadline: %w", err)
+	}
+
+	pubKey, err := conn.Handshake(pk)
+	if err != nil {
+		return nil, nil, fmt.Errorf("handshake failed: %w", err)
+	}
+
+	return pubKey, conn, nil
+}
+
+// Dial attempts to Dial the given node and perform a handshake,
+func Dial(pk *ecdsa.PrivateKey, n *enode.Node) (*Conn, error) {
 	var conn Conn
 
 	// dial
@@ -100,7 +117,7 @@ func dial(pk *ecdsa.PrivateKey, n *enode.Node) (*Conn, error) {
 	return &conn, nil
 }
 
-func writeHello(conn *Conn, priv *ecdsa.PrivateKey) error {
+func WriteHello(conn *Conn, priv *ecdsa.PrivateKey) error {
 	pub0 := crypto.FromECDSAPub(&priv.PublicKey)[1:]
 
 	h := &Hello{
@@ -120,7 +137,7 @@ func writeHello(conn *Conn, priv *ecdsa.PrivateKey) error {
 	return conn.Write(h)
 }
 
-func readHello(conn *Conn, info *common.ClientInfo) error {
+func ReadHello(conn *Conn, info *common.ClientInfo) error {
 	switch msg := conn.Read().(type) {
 	case *Hello:
 		// set snappy if version is at least 5
@@ -131,7 +148,7 @@ func readHello(conn *Conn, info *common.ClientInfo) error {
 		info.RLPxVersion = msg.Version
 		info.ClientName = msg.Name
 
-		conn.negotiateEthProtocol(info.Capabilities)
+		conn.NegotiateEthProtocol(info.Capabilities)
 
 		return nil
 	case *Disconnect:

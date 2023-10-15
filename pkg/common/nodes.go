@@ -51,8 +51,9 @@ type NodeJSON struct {
 
 	Info *ClientInfo `json:"clientInfo,omitempty"`
 
-	Error   string
-	EthNode bool
+	Error     string
+	EthNode   bool
+	Direction string
 }
 
 func (n *NodeJSON) ID() string {

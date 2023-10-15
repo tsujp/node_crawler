@@ -53,8 +53,7 @@ func (d *DB) CreateTables() error {
 			city			TEXT		DEFAULT NULL,
 			latitude		REAL		DEFAULT NULL,
 			longitude		REAL		DEFAULT NULL,
-			sequence		INTEGER		DEFAULT NULL,
-			score			INTEGER		DEFAULT NULL
+			sequence		INTEGER		DEFAULT NULL
 		);
 
 		CREATE INDEX IF NOT EXISTS id_last_seen
@@ -65,6 +64,7 @@ func (d *DB) CreateTables() error {
 		CREATE TABLE IF NOT EXISTS crawl_history (
 			id			TEXT		NOT NULL,
 			crawled_at	TIMESTAMPTZ	NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			direction	TEXT		NOT NULL,
 			error		TEXT		DEFAULT NULL,
 
 			PRIMARY KEY (id, crawled_at)

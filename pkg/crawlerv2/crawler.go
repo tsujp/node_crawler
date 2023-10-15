@@ -2,15 +2,20 @@ package crawlerv2
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
+	"math/big"
+	"net"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/forkid"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/crawler"
 	"github.com/ethereum/node-crawler/pkg/database"
@@ -31,13 +36,17 @@ func nodeIDString(start string, c byte) string {
 }
 
 type CrawlerV2 struct {
-	db        *database.DB
-	nodeKey   *ecdsa.PrivateKey
-	genesis   *core.Genesis
-	networkID uint64
-	workers   uint64
+	db         *database.DB
+	nodeKey    *ecdsa.PrivateKey
+	listenAddr string
+	workers    uint64
 
-	wg *sync.WaitGroup
+	ch              chan common.NodeJSON
+	wg              *sync.WaitGroup
+	listener        net.Listener
+	status          *crawler.Status
+	totalDifficulty big.Int
+	genesisBlock    *types.Block
 }
 
 func NewCrawlerV2(
@@ -45,14 +54,14 @@ func NewCrawlerV2(
 	nodeKey *ecdsa.PrivateKey,
 	genesis *core.Genesis,
 	networkID uint64,
+	listenAddr string,
 	workers uint64,
 ) (*CrawlerV2, error) {
-	crawler := &CrawlerV2{
-		db:        db,
-		nodeKey:   nodeKey,
-		genesis:   genesis,
-		networkID: networkID,
-		workers:   workers,
+	c := &CrawlerV2{
+		db:         db,
+		nodeKey:    nodeKey,
+		listenAddr: listenAddr,
+		workers:    workers,
 	}
 
 	switch workers {
@@ -61,127 +70,212 @@ func NewCrawlerV2(
 		return nil, fmt.Errorf("num crawlers: %d not in 1,2,4,8,16", workers)
 	}
 
-	crawler.wg = new(sync.WaitGroup)
+	c.wg = new(sync.WaitGroup)
+	c.ch = make(chan common.NodeJSON, 64)
 
-	return crawler, nil
+	td := big.NewInt(0)
+	// Merge total difficulty
+	td.SetString("58750003716598360000000", 10)
+
+	genesisBlock := genesis.ToBlock()
+	genesisHash := genesisBlock.Hash()
+
+	c.status = &crawler.Status{
+		ProtocolVersion: 66,
+		NetworkID:       networkID,
+		TD:              td,
+		Head:            genesisHash,
+		Genesis:         genesisHash,
+		ForkID:          forkid.NewID(genesis.Config, genesisBlock, 0, 0),
+	}
+
+	return c, nil
 }
 
 func (c *CrawlerV2) Wait() {
 	c.wg.Wait()
 }
 
-var hexAlpha = "0123456789abcdef"
-
-type Range struct {
-	start string
-	end   string
+func (c *CrawlerV2) Close() {
+	if c.listener != nil {
+		c.listener.Close()
+	}
 }
 
-func Range16() []Range {
-	out := make([]Range, 16)
+func nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.Node {
+	var ip net.IP
+	var port int
 
-	for i := 0; i < 16; i++ {
-		prefix := string([]byte{hexAlpha[i]})
+	if tcp, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+		ip = tcp.IP
+		port = tcp.Port
+	}
 
-		out[i] = Range{
-			start: nodeIDString(prefix, '0'),
-			end:   nodeIDString(prefix, 'f'),
+	return enode.NewV4(pubkey, ip, port, port)
+}
+
+func (c *CrawlerV2) getClientInfo(
+	conn *crawler.Conn,
+	node *enode.Node,
+	direction string,
+) {
+	err := crawler.WriteHello(conn, c.nodeKey)
+	if err != nil {
+		c.ch <- common.NodeJSON{
+			N:         node,
+			EthNode:   true,
+			Direction: direction,
+		}
+
+		return
+	}
+
+	var disconnect *crawler.Disconnect = nil
+	var readError *crawler.Error = nil
+	info := common.ClientInfo{}
+	ethNode := true
+
+	loop := true
+	for loop {
+		switch msg := conn.Read().(type) {
+		case *crawler.Ping:
+			_ = conn.Write(crawler.Pong{})
+		case *crawler.Pong:
+			continue
+		case *crawler.Hello:
+			if msg.Version >= 5 {
+				conn.SetSnappy(true)
+			}
+			info.Capabilities = msg.Caps
+			info.RLPxVersion = msg.Version
+			info.ClientName = msg.Name
+
+			conn.NegotiateEthProtocol(info.Capabilities)
+
+			if conn.NegotiatedProtoVersion == 0 {
+				ethNode = false
+				_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscUselessPeer})
+
+				loop = false
+
+				break
+			}
+
+			_ = conn.Write(c.status)
+		case *crawler.Status:
+			info.ForkID = msg.ForkID
+			info.HeadHash = msg.Head
+			info.NetworkID = msg.NetworkID
+
+			_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscQuitting})
+
+			loop = false
+		case *crawler.Disconnect:
+			disconnect = msg
+			loop = false
+		case *crawler.Error:
+			readError = msg
+			loop = false
+		default:
+			log.Error("message type not handled", "msg", msg)
 		}
 	}
 
-	return out
+	nodeJSON := common.NodeJSON{
+		N:         node,
+		EthNode:   ethNode,
+		Info:      &info,
+		Direction: direction,
+	}
+
+	if !ethNode {
+		c.ch <- nodeJSON
+		return
+	} else if disconnect != nil {
+		nodeJSON.Error = disconnect.Reason.String()
+	} else if readError != nil {
+		nodeJSON.Error = readError.String()
+	}
+
+	c.ch <- nodeJSON
 }
 
-func Range8() []Range {
-	out := make([]Range, 8)
+func (c *CrawlerV2) crawlPeer(fd net.Conn) {
+	pubKey, conn, err := crawler.Accept(c.nodeKey, fd)
+	if err != nil {
+		log.Info("accept peer failed", "err", err)
+		return
+	}
+	defer conn.Close()
 
-	for i := 0; i < 8; i++ {
-		start := string([]byte{hexAlpha[i*2]})
-		end := string([]byte{hexAlpha[i*2+1]})
+	c.getClientInfo(
+		conn,
+		nodeFromConn(pubKey, fd),
+		"accept",
+	)
+}
 
-		out[i] = Range{
-			start: nodeIDString(start, '0'),
-			end:   nodeIDString(end, 'f'),
+func (c *CrawlerV2) listenLoop() {
+	defer c.wg.Done()
+
+	for {
+		var (
+			conn net.Conn
+			err  error
+		)
+
+		for {
+			conn, err = c.listener.Accept()
+			if netutil.IsTemporaryError(err) {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			} else if err != nil {
+				log.Error("crawler listener accept failed", "err", err)
+			}
+
+			break
 		}
-	}
 
-	return out
-}
-
-func Range4() []Range {
-	out := make([]Range, 4)
-
-	for i := 0; i < 4; i++ {
-		start := string([]byte{hexAlpha[i*4]})
-		end := string([]byte{hexAlpha[i*4+3]})
-
-		out[i] = Range{
-			start: nodeIDString(start, '0'),
-			end:   nodeIDString(end, 'f'),
-		}
-	}
-
-	return out
-}
-
-func Range2() []Range {
-	return []Range{
-		{
-			start: nodeIDString("0", '0'),
-			end:   nodeIDString("7", 'f'),
-		},
-		{
-			start: nodeIDString("8", '0'),
-			end:   nodeIDString("f", 'f'),
-		},
+		go c.crawlPeer(conn)
 	}
 }
 
-func Range1() []Range {
-	return []Range{
-		{
-			start: nodeIDString("0", '0'),
-			end:   nodeIDString("f", 'f'),
-		},
+func (c *CrawlerV2) startListener() error {
+	listener, err := net.Listen("tcp", c.listenAddr)
+	if err != nil {
+		return fmt.Errorf("crawler listen failed: %w", err)
 	}
-}
 
-func RangeN(n uint64) []Range {
-	switch n {
-	case 1:
-		return Range1()
-	case 2:
-		return Range2()
-	case 4:
-		return Range4()
-	case 8:
-		return Range8()
-	case 16:
-		return Range16()
-	default:
-		panic("invalid num crawler range")
-	}
-}
-
-func (c *CrawlerV2) StartDaemon() error {
-	ch := make(chan common.NodeJSON, 64)
-
-	for _, v := range RangeN(c.workers) {
-		c.wg.Add(1)
-		go c.sliceCrawler(v.start, v.end, ch)
-	}
+	c.listener = listener
 
 	c.wg.Add(1)
-	go c.updaterLoop(ch)
+	go c.listenLoop()
 
 	return nil
 }
 
-func (c *CrawlerV2) updaterLoop(ch <-chan common.NodeJSON) {
+func (c *CrawlerV2) StartDaemon() error {
+	for _, v := range rangeN(c.workers) {
+		c.wg.Add(1)
+		go c.sliceCrawler(v.start, v.end)
+	}
+
+	err := c.startListener()
+	if err != nil {
+		return fmt.Errorf("starting listener failed: %w", err)
+	}
+
+	c.wg.Add(1)
+	go c.updaterLoop()
+
+	return nil
+}
+
+func (c *CrawlerV2) updaterLoop() {
 	c.wg.Done()
 
 	for {
-		node := <-ch
+		node := <-c.ch
 
 		err := c.db.UpsertCrawledNode(node)
 		if err != nil {
@@ -190,49 +284,79 @@ func (c *CrawlerV2) updaterLoop(ch <-chan common.NodeJSON) {
 	}
 }
 
-func (c *CrawlerV2) crawlNode(node *enode.Node, ch chan<- common.NodeJSON) {
-	nodeJSON := common.NodeJSON{
-		N:       node,
-		EthNode: true,
-	}
-
-	clientInfo, err := crawler.GetClientInfo(c.nodeKey, c.genesis, c.networkID, "", node)
+func (c *CrawlerV2) crawlNode(node *enode.Node) {
+	conn, err := crawler.Dial(c.nodeKey, node)
 	if err != nil {
-		if errors.Is(err, crawler.ErrNotEthNode) {
-			nodeJSON.EthNode = false
-			ch <- nodeJSON
-
-			return
+		nodeJson := common.NodeJSON{
+			N:         node,
+			EthNode:   true,
+			Direction: "dial",
+		}
+		switch errStr := err.Error(); {
+		case strings.Contains(errStr, "connection reset by peer"):
+			nodeJson.Error = "connection reset by peer"
+		case strings.Contains(errStr, "EOF"):
+			nodeJson.Error = "EOF"
+		case strings.Contains(errStr, "i/o timeout"):
+			nodeJson.Error = "i/o timeout"
+		case strings.Contains(errStr, "no route to host"):
+			nodeJson.Error = "no route to host"
+		case strings.Contains(errStr, "connection refused"):
+			nodeJson.Error = "connection refused"
+		default:
+			log.Info("dial failed", "err", err)
+			nodeJson.Error = errStr
 		}
 
-		e := err.Error()
-		if strings.Contains(e, "too many peers") {
-			nodeJSON.Error = "too many peers"
-		} else if strings.Contains(e, "connection reset by peer") {
-			nodeJSON.Error = "connection reset by peer"
-		} else if strings.Contains(e, "i/o timeout") {
-			nodeJSON.Error = "i/o timeout"
-		} else if strings.Contains(e, "connection refused") {
-			nodeJSON.Error = "connection refused"
-		} else if strings.Contains(e, "EOF") {
-			nodeJSON.Error = "EOF"
-		} else if strings.Contains(e, "disconnect requested") {
-			nodeJSON.Error = "disconnect requested"
-		} else if strings.Contains(e, "useless peer") {
-			nodeJSON.Error = "useless peer"
-		} else {
-			log.Info("get client info failed", "node", node.ID().TerminalString(), "err", err)
-			nodeJSON.Error = e
-		}
+		c.ch <- nodeJson
+
+		return
 	}
+	defer conn.Close()
 
-	nodeJSON.Info = clientInfo
+	c.getClientInfo(conn, node, "dial")
 
-	ch <- nodeJSON
+	// nodeJSON := common.NodeJSON{
+	// 	N:       node,
+	// 	EthNode: true,
+	// }
 
+	// clientInfo, err := crawler.GetClientInfo(c.nodeKey, c.genesis, c.networkID, "", node)
+	// if err != nil {
+	// 	if errors.Is(err, crawler.ErrNotEthNode) {
+	// 		nodeJSON.EthNode = false
+	// 		c.ch <- nodeJSON
+
+	// 		return
+	// 	}
+
+	// 	e := err.Error()
+	// 	if strings.Contains(e, "too many peers") {
+	// 		nodeJSON.Error = "too many peers"
+	// 	} else if strings.Contains(e, "connection reset by peer") {
+	// 		nodeJSON.Error = "connection reset by peer"
+	// 	} else if strings.Contains(e, "i/o timeout") {
+	// 		nodeJSON.Error = "i/o timeout"
+	// 	} else if strings.Contains(e, "connection refused") {
+	// 		nodeJSON.Error = "connection refused"
+	// 	} else if strings.Contains(e, "EOF") {
+	// 		nodeJSON.Error = "EOF"
+	// 	} else if strings.Contains(e, "disconnect requested") {
+	// 		nodeJSON.Error = "disconnect requested"
+	// 	} else if strings.Contains(e, "useless peer") {
+	// 		nodeJSON.Error = "useless peer"
+	// 	} else {
+	// 		log.Info("get client info failed", "node", node.ID().TerminalString(), "err", err)
+	// 		nodeJSON.Error = e
+	// 	}
+	// }
+
+	// nodeJSON.Info = clientInfo
+
+	// c.ch <- nodeJSON
 }
 
-func (c *CrawlerV2) sliceCrawler(nIDStart string, nIDEnd string, ch chan<- common.NodeJSON) {
+func (c *CrawlerV2) sliceCrawler(nIDStart string, nIDEnd string) {
 	defer c.wg.Done()
 
 	log.Info("start crawler", "start", nIDStart, "end", nIDEnd)
@@ -254,7 +378,7 @@ func (c *CrawlerV2) sliceCrawler(nIDStart string, nIDEnd string, ch chan<- commo
 		}
 
 		for _, node := range nodes {
-			c.crawlNode(node, ch)
+			c.crawlNode(node)
 		}
 
 		// Wait for database updater to catch up a bit

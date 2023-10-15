@@ -5,7 +5,8 @@ import "strconv"
 import "fmt"
 
 templ NodeTable(nt database.NodeTable) {
-	<div>
+	<div style="margin: 1em;">
+		<h3>Node</h3>
 		<table style="max-width=100%">
 			<tbody>
 				<tr>
@@ -72,19 +73,78 @@ templ NodeTable(nt database.NodeTable) {
 					<td>City</td>
 					<td>{ nt.City }</td>
 				</tr>
+				<tr>
+					<td>Next Crawl (Scheduled)</td>
+					<td>{ nt.SinceNextCrawl() } ago ({ nt.NextCrawl })</td>
+				</tr>
 			</tbody>
 		</table>
 		<div style="position: relative; width: max-content;">
 			<image width="800px" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Blue_Marble_2002.png/1280px-Blue_Marble_2002.png"></image>
 			<image style="REPLACE_THIS_ETH_LOGO" height="10%" src="https://ethereum.org/static/2aba39d4e25d90caabb0c85a58c6aba9/f41b0/eth-glyph-colored.png"></image>
 		</div>
+		<h3>Crawl Hitory</h3>
+		<table>
+			<thead>
+				<tr>
+					<td>Timestamp</td>
+					<td>Direction</td>
+					<td>Error</td>
+				</tr>
+			</thead>
+			<tbody>
+				for _, row := range nt.History {
+					<tr>
+						<td>{ row.CrawledAt }</td>
+						<td>{ row.Direction }</td>
+						<td>{ row.Error }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
 	</div>
 }
 
+css nodeListClass() {
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	margin: 1em;
+}
+
 templ NodeList(nodes database.NodeList) {
-	<div style="display:flex;flex-direction:row;justify-content:center">
-		<div style="width:max-content">
+	<div class={ nodeListClass() }>
+		<div style="width:100%">
 			<h3>Nodes</h3>
+			<div style="display:none">
+				for _, networkID := range nodes.Networks {
+					<a href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", networkID, nodes.PageNumber)) }>
+						{ nodes.NetworkName(networkID) }
+					</a>
+				}
+			</div>
+			<div style="display:flex;flex-direction:row;gap:0.5em;">
+				<a
+ 					class={ pageButton(), pageButtonInactive(), pageButtonActive(), templ.KV(pageButtonActive(), -1 == nodes.NetworkFilter), templ.KV(pageButtonInactive(), -1 != nodes.NetworkFilter) }
+ 					href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", -1, nodes.PageNumber)) }
+				>
+					All (-1)
+				</a>
+				for _, networkID := range []int{1, 5, 17000, 11155111} {
+					<a
+ 						class={ 
+							pageButton(),
+							pageButtonInactive(),
+							pageButtonActive(),
+							templ.KV(pageButtonActive(), networkID == nodes.NetworkFilter),
+							templ.KV(pageButtonInactive(), networkID != nodes.NetworkFilter),
+						 }
+ 						href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", networkID, nodes.PageNumber)) }
+					>
+						{ nodes.NetworkName(networkID) }
+					</a>
+				}
+			</div>
 			<table style="width:100%">
 				<thead>
 					<tr>
@@ -116,15 +176,15 @@ templ NodeList(nodes database.NodeList) {
 				</span>
 				<div style="display:flex;flex-direction:row;align-items:center">
 					if nodes.PageNumber > 6 {
-						@pageNumberButton(1, false)
+						@pageNumberButton(nodes.NetworkFilter, 1, false)
 						@spacer()
 					}
-					for i := startPage(nodes.PageNumber, nodes.NPages()); i <= endPage(nodes.PageNumber, nodes.NPages()); i++ {
-						@pageNumberButton(i, i == nodes.PageNumber)
+					for i := startPage(nodes); i <= endPage(nodes); i++ {
+						@pageNumberButton(nodes.NetworkFilter, i, i == nodes.PageNumber)
 					}
 					if nodes.PageNumber < nodes.NPages() - 4 {
 						@spacer()
-						@pageNumberButton(nodes.NPages(), false)
+						@pageNumberButton(nodes.NetworkFilter, nodes.NPages(), false)
 					}
 				</div>
 			</div>
@@ -132,28 +192,28 @@ templ NodeList(nodes database.NodeList) {
 	</div>
 }
 
-func startPage(pageNum int, totalPages int) int {
-	if pageNum < 7 {
+func startPage(nodes database.NodeList) int {
+	if nodes.PageNumber < 7 {
 		return 1
 	}
 
-	if pageNum > totalPages-5 {
-		return totalPages - 8
+	if nodes.PageNumber > nodes.NPages()-5 {
+		return nodes.NPages() - 8
 	}
 
-	return pageNum - 3
+	return nodes.PageNumber - 3
 }
 
-func endPage(pageNum int, totalPages int) int {
-	if pageNum < 6 {
+func endPage(nodes database.NodeList) int {
+	if nodes.PageNumber < 6 {
 		return 9
 	}
 
-	if pageNum > totalPages-5 {
-		return totalPages
+	if nodes.PageNumber > nodes.NPages()-5 {
+		return nodes.NPages()
 	}
 
-	return pageNum + 3
+	return nodes.PageNumber + 3
 }
 
 templ spacer() {
@@ -162,16 +222,24 @@ templ spacer() {
 	</div>
 }
 
-templ pageNumberButton(pageNumber int, isPage bool) {
-	if isPage {
-		<a href={ templ.URL(fmt.Sprintf("/nodes?page=%d", pageNumber)) } style="margin:0.1em;padding:0.5em 1em;border-radius: 0.2em;border:1px solid orange;">
-			<span>{ strconv.Itoa(pageNumber) }</span>
-		</a>
-	} else {
-		<a href={ templ.URL(fmt.Sprintf("/nodes?page=%d", pageNumber)) } style="margin:0.1em;padding:0.5em 1em;border-radius:0.2em;border:1px solid #eee;">
-			{ strconv.Itoa(pageNumber) }
-		</a>
-	}
+templ pageNumberButton(networkID int, pageNumber int, isPage bool) {
+	<a href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", networkID, pageNumber)) } class={ pageButton(), pageButtonActive(), pageButtonInactive(), templ.KV(pageButtonActive(), isPage), templ.KV(pageButtonInactive(), !isPage) }>
+		{ strconv.Itoa(pageNumber) }
+	</a>
+}
+
+css pageButton() {
+	margin: 0.1em;
+	padding: 0.5em 1em;
+	border-radius: 0.2em;
+}
+
+css pageButtonActive() {
+	border: 2px solid orange;
+}
+
+css pageButtonInactive() {
+	border: 2px solid #eee;
 }
 
 templ Index(main templ.Component) {
@@ -181,6 +249,17 @@ templ Index(main templ.Component) {
 			<script src="https://unpkg.com/htmx.org@1.9.6"></script>
 			<title>Node Crawler</title>
 			<style type="text/css">
+				body {
+					margin: 0;
+					background-color: #222;
+					color: #eee;
+				}
+				a:link {
+					color: #eee;
+				}
+				a:visited {
+					color: orange;
+				}
 				td {
 					padding: 0.5em 1em;
 					word-break: break-all;
@@ -189,12 +268,44 @@ templ Index(main templ.Component) {
 					white-space: nowrap;
 				}
 				tr:nth-of-type(even) {
-					background-color: #ddd;
+					background-color: #333;
+				}
+				nav {
+					background-color: #333;
+					display: flex;
+					flex-direction: row;
+				}
+				nav ul {
+					display: flex;
+					flex-direction: row;
+					list-style-type: none;
+					margin: 0;
+					padding: 0;
+					overflow: hidden;
+				}
+				nav li a,
+				nav li a:visited {
+					display: block;
+					color: white;
+					text-align: center;
+					padding: 1em;
+					text-decoration: none;
+				}
+				nav li a:hover {
+					background-color: #111;
 				}
 			</style>
 		</head>
 		<body>
-			{! main }
+			<nav>
+				<ul>
+					<li><a href="/">Home</a></li>
+					<li><a href="/nodes?page=1">Nodes</a></li>
+				</ul>
+			</nav>
+			<main>
+				{! main }
+			</main>
 		</body>
 	</html>
 }

@@ -9,6 +9,12 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+type NodeTableHistory struct {
+	CrawledAt string
+	Direction string
+	Error     string
+}
+
 type NodeTable struct {
 	ID             string
 	UpdatedAt      string
@@ -28,6 +34,9 @@ type NodeTable struct {
 	Latitude       float64
 	Longitude      float64
 	Sequence       string
+	NextCrawl      string
+
+	History []NodeTableHistory
 }
 
 func (n NodeTable) YOffsetPercent() int {
@@ -50,6 +59,10 @@ func sinceUpdate(updatedAt string) string {
 
 func (n NodeTable) SinceUpdate() string {
 	return sinceUpdate(n.UpdatedAt)
+}
+
+func (n NodeTable) SinceNextCrawl() string {
+	return sinceUpdate(n.NextCrawl)
 }
 
 func networkName(networkID int) string {
@@ -93,7 +106,8 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				coalesce(city, ''),
 				coalesce(latitude, 0),
 				coalesce(longitude, 0),
-				coalesce(CAST(sequence AS TEXT), '')
+				coalesce(CAST(sequence AS TEXT), ''),
+				coalesce(next_crawl, '')
 			FROM crawled_nodes AS crawled
 			JOIN discovered_nodes AS disc ON (crawled.id = disc.id)
 			WHERE crawled.id = ?
@@ -122,9 +136,49 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		&nodePage.Latitude,
 		&nodePage.Longitude,
 		&nodePage.Sequence,
+		&nodePage.NextCrawl,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("row scan failed: %w", err)
+	}
+
+	rows, err := db.db.QueryContext(
+		ctx,
+		`
+			SELECT
+				crawled_at,
+				direction,
+				coalesce(error, '')
+			FROM crawl_history
+			WHERE
+				id = ?
+			LIMIT 10
+		`,
+		nodeID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("history query failed: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		history := NodeTableHistory{}
+
+		err = rows.Scan(
+			&history.CrawledAt,
+			&history.Direction,
+			&history.Error,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("history row scan failed: %w", err)
+		}
+
+		nodePage.History = append(nodePage.History, history)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("history rows iteration failed: %w", err)
 	}
 
 	return nodePage, nil
@@ -142,18 +196,25 @@ func (n NodeListRow) SinceUpdate() string {
 }
 
 type NodeList struct {
-	PageNumber int
-	PageSize   int
-	Offset     int
-	Total      int
-	List       []NodeListRow
+	PageNumber    int
+	PageSize      int
+	Offset        int
+	Total         int
+	NetworkFilter int
+	List          []NodeListRow
+
+	Networks []int
+}
+
+func (_ NodeList) NetworkName(networkID int) string {
+	return fmt.Sprintf("%s (%d)", networkName(networkID), networkID)
 }
 
 func (l NodeList) NPages() int {
 	return int(math.Ceil(float64(l.Total) / float64(l.PageSize)))
 }
 
-func (db *DB) GetNodeList(ctx context.Context, pageNumber int) (*NodeList, error) {
+func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int) (*NodeList, error) {
 	pageSize := 10
 	offset := (pageNumber - 1) * pageSize
 
@@ -167,10 +228,16 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int) (*NodeList, error
 				coalesce(country, ''),
 				COUNT(*) OVER () AS total
 			FROM crawled_nodes
+			WHERE
+				(
+					network_id = ?1
+					OR -1 = ?1
+				)
 			ORDER BY id
-			LIMIT ?
-			OFFSET ?
+			LIMIT ?2
+			OFFSET ?3
 		`,
+		networkID,
 		pageSize,
 		offset,
 	)
@@ -180,11 +247,13 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int) (*NodeList, error
 	defer rows.Close()
 
 	out := NodeList{
-		PageSize:   pageSize,
-		PageNumber: pageNumber,
-		Offset:     offset,
-		Total:      0,
-		List:       []NodeListRow{},
+		PageSize:      pageSize,
+		PageNumber:    pageNumber,
+		Offset:        offset,
+		Total:         0,
+		List:          []NodeListRow{},
+		Networks:      []int{},
+		NetworkFilter: networkID,
 	}
 
 	for rows.Next() {
@@ -206,6 +275,42 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int) (*NodeList, error
 	if err != nil {
 		return nil, fmt.Errorf("rows failed: %w", err)
 	}
+
+	rows.Close()
+
+	rows, err = db.db.QueryContext(
+		ctx,
+		`
+			SELECT
+				DISTINCT network_id
+			FROM crawled_nodes
+			WHERE
+				network_id IS NOT NULL
+			ORDER BY network_id
+		`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("networks query failed: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var networkID int
+
+		err = rows.Scan(&networkID)
+		if err != nil {
+			return nil, fmt.Errorf("networks scan failed: %w", err)
+		}
+
+		out.Networks = append(out.Networks, networkID)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("networks rows failed: %w", err)
+	}
+
+	rows.Close()
 
 	return &out, nil
 }

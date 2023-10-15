@@ -37,23 +37,42 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 	_, err := db.ExecRetryBusy(
 		0,
 		`
-			UPDATE discovered_nodes
+			INSERT INTO discovered_nodes (
+				id,
+				node,
+				ip_address,
+				first_found,
+				last_found,
+				next_crawl
+			) VALUES (
+				?1,
+				?2,
+				?3,
+				CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP,
+				datetime(CURRENT_TIMESTAMP, '+24 hours')
+			)
+			ON CONFLICT (id) DO UPDATE
 			SET
-				next_crawl = datetime(CURRENT_TIMESTAMP, '+6 hours')
-			WHERE
-				id = ?1;
+				last_found = CURRENT_TIMESTAMP,
+				next_crawl = excluded.next_crawl;
 
 			INSERT INTO crawl_history (
 				id,
 				crawled_at,
+				direction,
 				error
 			) VALUES (
 				?1,
 				CURRENT_TIMESTAMP,
-				?2
+				?4,
+				?5
 			);
 		`,
 		node.ID(),
+		node.N.String(),
+		node.N.IP().String(),
+		node.Direction,
 		node.Error,
 	)
 	if err != nil {
@@ -67,13 +86,29 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 	_, err := db.ExecRetryBusy(
 		0,
 		`
-			UPDATE discovered_nodes
+			INSERT INTO discovered_nodes (
+				id,
+				node,
+				ip_address,
+				first_found,
+				last_found,
+				next_crawl
+			) VALUES (
+				?1,
+				?2,
+				?3,
+				CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP,
+				datetime(CURRENT_TIMESTAMP, '+14 days')
+			)
+			ON CONFLICT (id) DO UPDATE
 			SET
-				next_crawl = datetime(CURRENT_TIMESTAMP, '+14 days')
-			WHERE
-				id = ?1;
+				last_found = CURRENT_TIMESTAMP,
+				next_crawl = excluded.next_crawl
 		`,
 		node.ID(),
+		node.N.String(),
+		node.N.IP().String(),
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)
@@ -170,19 +205,35 @@ func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
 			RETURNING
 				id;
 
-			UPDATE discovered_nodes
+			INSERT INTO discovered_nodes (
+				id,
+				node,
+				ip_address,
+				first_found,
+				last_found,
+				next_crawl
+			) VALUES (
+				?1,
+				?17,
+				?10,
+				CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP,
+				datetime(CURRENT_TIMESTAMP, '+6 hours')
+			)
+			ON CONFLICT (id) DO UPDATE
 			SET
-				next_crawl = datetime(CURRENT_TIMESTAMP, '+1 hour')
-			WHERE
-				id = ?1;
+				last_found = CURRENT_TIMESTAMP,
+				next_crawl = excluded.next_crawl;
 
 			INSERT INTO crawl_history (
 				id,
 				crawled_at,
+				direction,
 				error
 			) VALUES (
 				?1,
 				CURRENT_TIMESTAMP,
+				?18,
 				NULL
 			);
 		`,
@@ -202,6 +253,8 @@ func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
 		location.latitude,
 		location.longitude,
 		node.N.Seq(),
+		node.N.String(),
+		node.Direction,
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)

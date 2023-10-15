@@ -180,6 +180,7 @@ func crawlNodesV2(cCtx *cli.Context) error {
 		nodeKey,
 		core.DefaultGenesisBlock(),
 		utils.NetworkIdFlag.Get(cCtx),
+		listenAddrFlag.Get(cCtx),
 		workersFlag.Get(cCtx),
 	)
 	if err != nil {

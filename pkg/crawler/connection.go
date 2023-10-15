@@ -155,7 +155,7 @@ func (msg PooledTransactions) ReqID() uint64 { return msg.RequestId }
 type Conn struct {
 	*rlpx.Conn
 	ourKey                     *ecdsa.PrivateKey
-	negotiatedProtoVersion     uint
+	NegotiatedProtoVersion     uint
 	negotiatedSnapProtoVersion uint
 	ourHighestProtoVersion     uint
 	ourHighestSnapProtoVersion uint
@@ -259,9 +259,9 @@ func (c *Conn) Write(msg Message) error {
 	return err
 }
 
-// negotiateEthProtocol sets the Conn's eth protocol version
+// NegotiateEthProtocol sets the Conn's eth protocol version
 // to highest advertised capability from peer
-func (c *Conn) negotiateEthProtocol(caps []p2p.Cap) {
+func (c *Conn) NegotiateEthProtocol(caps []p2p.Cap) {
 	var highestEthVersion uint
 	for _, capability := range caps {
 		if capability.Name != "eth" {
@@ -271,5 +271,5 @@ func (c *Conn) negotiateEthProtocol(caps []p2p.Cap) {
 			highestEthVersion = capability.Version
 		}
 	}
-	c.negotiatedProtoVersion = highestEthVersion
+	c.NegotiatedProtoVersion = highestEthVersion
 }
