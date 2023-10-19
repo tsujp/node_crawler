@@ -23,6 +23,12 @@
       ];
 
       perSystem = { config, pkgs, system, ... }: {
+        _module.args.pkgs = import inputs.nixpkgs {
+          inherit system;
+          overlays = [
+            inputs.templ.overlays.default
+          ];
+        };
         overlayAttrs = {
           inherit (config.packages)
             nodeCrawler
@@ -44,7 +50,7 @@
             CGO_ENABLED = 0;
 
             preBuild = ''
-              ${templ.packages.${system}.templ}/bin/templ generate
+              ${pkgs.templ}/bin/templ generate
             '';
 
             ldflags = [
@@ -74,7 +80,7 @@
             golangci-lint
             nodejs
             sqlite
-            templ.packages.${system}.templ
+            templ
           ];
         };
       };
