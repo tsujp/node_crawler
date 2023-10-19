@@ -96,7 +96,7 @@ func Accept(pk *ecdsa.PrivateKey, fd net.Conn) (*ecdsa.PublicKey, *Conn, error) 
 func Dial(pk *ecdsa.PrivateKey, n *enode.Node) (*Conn, error) {
 	var conn Conn
 
-	fd, err := net.DialTimeout("tcp", fmt.Sprintf("[%s]:%d", n.IP(), n.TCP()), 10*time.Second)
+	fd, err := net.DialTimeout("tcp", fmt.Sprintf("[%s]:%d", n.IP(), n.TCP()), 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
