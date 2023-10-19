@@ -3,12 +3,32 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    devshell.url = "github:numtide/devshell";
-    flake-parts.url = "github:hercules-ci/flake-parts";
-    templ.url = "github:angaz/templ/flake";
+
+    devshell = {
+      url = "github:numtide/devshell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+    };
+    gitignore = {
+      url = "github:hercules-ci/gitignore.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    templ = {
+      url = "github:angaz/templ/flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = inputs@{ self, nixpkgs, devshell, flake-parts, templ }:
+  outputs = inputs@{
+    self,
+    nixpkgs,
+    devshell,
+    flake-parts,
+    gitignore,
+    templ,
+  }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         devshell.flakeModule
@@ -35,12 +55,14 @@
             nodeCrawlerFrontend;
         };
 
-        packages = {
+        packages = let
+          inherit (gitignore.lib) gitignoreSource;
+        in {
           nodeCrawler = pkgs.buildGo121Module rec {
             pname = "crawler";
             version = "0.0.0";
 
-            src = ./.;
+            src = gitignoreSource ./.;
             subPackages = [ "cmd/crawler" ];
 
             vendorHash = "sha256-CkcdkPHqo+nIUERu0T0kyIDjHJ4CUPq4oJCN4X6dfQA=";
@@ -63,7 +85,7 @@
             pname = "frontend";
             version = "0.0.0";
 
-            src = ./frontend;
+            src = gitignoreSource ./frontend;
 
             npmDepsHash = "sha256-1nLQVoNkiA4x97UcPe8rNMXa7bYCskazpJesWVLnDHk=";
 
