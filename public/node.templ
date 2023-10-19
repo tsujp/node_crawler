@@ -125,7 +125,11 @@ templ NodeList(nodes database.NodeList) {
 			</div>
 			<div style="display:flex;flex-direction:row;gap:0.5em;">
 				<a
- 					class={ pageButton(), pageButtonInactive(), pageButtonActive(), templ.KV(pageButtonActive(), -1 == nodes.NetworkFilter), templ.KV(pageButtonInactive(), -1 != nodes.NetworkFilter) }
+ 					class={ 
+						pageButton(),
+						templ.KV(pageButtonActive(), -1 == nodes.NetworkFilter),
+						templ.KV(pageButtonInactive(), -1 != nodes.NetworkFilter),
+					 }
  					href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", -1, nodes.PageNumber)) }
 				>
 					All (-1)
@@ -134,8 +138,6 @@ templ NodeList(nodes database.NodeList) {
 					<a
  						class={ 
 							pageButton(),
-							pageButtonInactive(),
-							pageButtonActive(),
 							templ.KV(pageButtonActive(), networkID == nodes.NetworkFilter),
 							templ.KV(pageButtonInactive(), networkID != nodes.NetworkFilter),
 						 }
@@ -223,7 +225,14 @@ templ spacer() {
 }
 
 templ pageNumberButton(networkID int, pageNumber int, isPage bool) {
-	<a href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", networkID, pageNumber)) } class={ pageButton(), pageButtonActive(), pageButtonInactive(), templ.KV(pageButtonActive(), isPage), templ.KV(pageButtonInactive(), !isPage) }>
+	<a
+ 		href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", networkID, pageNumber)) }
+ 		class={ 
+			pageButton(),
+			templ.KV(pageButtonActive(), isPage),
+			templ.KV(pageButtonInactive(), !isPage),
+		 }
+	>
 		{ strconv.Itoa(pageNumber) }
 	</a>
 }
