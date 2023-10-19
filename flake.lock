@@ -228,11 +228,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1697317877,
-        "narHash": "sha256-hFSsSR/NjL47ebyuFO+Atf4B3gpCSg/469X8pnl92cA=",
+        "lastModified": 1697739128,
+        "narHash": "sha256-ceg22FbNVVzEfyhnfsr34FVtM0DzV69E+quUCLkt6MA=",
         "owner": "angaz",
         "repo": "templ",
-        "rev": "ff761fb3d76fccd6924755e4ff7f7f6e310054ef",
+        "rev": "a4d13ec9d5067ccc1e03507e08f72491be0b69c0",
         "type": "github"
       },
       "original": {
