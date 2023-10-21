@@ -72,7 +72,7 @@
             CGO_ENABLED = 0;
 
             preBuild = ''
-              ${pkgs.templ}/bin/templ generate
+              ${templ.packages.${system}.templ}/bin/templ generate
             '';
 
             ldflags = [
