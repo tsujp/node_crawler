@@ -27,7 +27,7 @@
     devshell,
     flake-parts,
     gitignore,
-    templ,
+    ...
   }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
@@ -43,12 +43,15 @@
       ];
 
       perSystem = { config, pkgs, system, ... }: {
+        # Add templ overlay to pkgs
         _module.args.pkgs = import inputs.nixpkgs {
           inherit system;
           overlays = [
             inputs.templ.overlays.default
           ];
         };
+
+        # Attrs for easyOverlay
         overlayAttrs = {
           inherit (config.packages)
             nodeCrawler
@@ -72,7 +75,7 @@
             CGO_ENABLED = 0;
 
             preBuild = ''
-              ${templ.packages.${system}.templ}/bin/templ generate
+              ${pkgs.templ}/bin/templ generate
             '';
 
             ldflags = [

@@ -221,11 +221,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1697743292,
-        "narHash": "sha256-u2FDLhMYBxegqVqhoAhRqHuYyUJkakD88VOM/oCipjc=",
+        "lastModified": 1697897111,
+        "narHash": "sha256-QLXT8iIwmVL3EAIs27m+64Rsu/zOewrdy4vHsyeAPDQ=",
         "owner": "angaz",
         "repo": "templ",
-        "rev": "01d71be043da448431137029e54adb1636f39a24",
+        "rev": "d2eb49a986e421bc04201c56a27698d0c0413249",
         "type": "github"
       },
       "original": {
