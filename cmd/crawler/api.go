@@ -37,15 +37,6 @@ func startAPI(ctx *cli.Context) error {
 	autovacuum := ctx.String(autovacuumFlag.Name)
 	busyTimeout := ctx.Uint64(busyTimeoutFlag.Name)
 
-	crawlerDB, err := openSQLiteDB(
-		ctx.String(crawlerDBFlag.Name),
-		autovacuum,
-		busyTimeout,
-	)
-	if err != nil {
-		return err
-	}
-
 	apiDBPath := ctx.String(apiDBFlag.Name)
 	shouldInit := false
 	if _, err := os.Stat(apiDBPath); os.IsNotExist(err) {
@@ -82,8 +73,8 @@ func startAPI(ctx *cli.Context) error {
 	wg.Add(3)
 
 	// Start reading deamon
-	go newNodeDeamon(&wg, crawlerDB, nodeDB)
-	go dropDeamon(&wg, nodeDB, ctx.Duration(dropNodesTimeFlag.Name))
+	// go newNodeDeamon(&wg, crawlerDB, nodeDB)
+	// go dropDeamon(&wg, nodeDB, ctx.Duration(dropNodesTimeFlag.Name))
 
 	// Start the API deamon
 	apiAddress := ctx.String(apiListenAddrFlag.Name)
