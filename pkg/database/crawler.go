@@ -35,7 +35,6 @@ func (db *DB) IPToLocation(ip net.IP) (location, error) {
 
 func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 	_, err := db.ExecRetryBusy(
-		0,
 		`
 			INSERT INTO discovered_nodes (
 				id,
@@ -84,7 +83,6 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 
 func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 	_, err := db.ExecRetryBusy(
-		0,
 		`
 			INSERT INTO discovered_nodes (
 				id,
@@ -145,7 +143,6 @@ func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
 	}
 
 	_, err = db.ExecRetryBusy(
-		0,
 		`
 			INSERT INTO crawled_nodes (
 				id,

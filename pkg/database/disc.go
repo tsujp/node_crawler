@@ -9,7 +9,6 @@ import (
 
 func (d *DB) UpsertNode(node *enode.Node) error {
 	_, err := d.ExecRetryBusy(
-		0,
 		`
 			INSERT INTO discovered_nodes (
 				id,
