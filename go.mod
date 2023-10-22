@@ -3,6 +3,7 @@ module github.com/ethereum/node-crawler
 go 1.21
 
 require (
+	github.com/a-h/templ v0.2.408
 	github.com/ethereum/go-ethereum v1.13.2
 	github.com/fjl/memsize v0.0.2
 	github.com/gorilla/mux v1.8.0
@@ -21,7 +22,6 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
-	github.com/a-h/templ v0.2.408 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.7.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect

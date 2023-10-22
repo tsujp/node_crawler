@@ -42,15 +42,10 @@
         "aarch64-darwin"
       ];
 
-      perSystem = { config, pkgs, system, ... }: {
-        # Add templ overlay to pkgs
-        _module.args.pkgs = import inputs.nixpkgs {
-          inherit system;
-          overlays = [
-            inputs.templ.overlays.default
-          ];
-        };
-
+      perSystem = { config, pkgs, system, ... }: let
+        inherit (gitignore.lib) gitignoreSource;
+        templ = inputs.templ.packages.${system}.templ;
+      in {
         # Attrs for easyOverlay
         overlayAttrs = {
           inherit (config.packages)
@@ -58,9 +53,7 @@
             nodeCrawlerFrontend;
         };
 
-        packages = let
-          inherit (gitignore.lib) gitignoreSource;
-        in {
+        packages = {
           nodeCrawler = pkgs.buildGo121Module rec {
             pname = "crawler";
             version = "0.0.0";
@@ -68,14 +61,14 @@
             src = gitignoreSource ./.;
             subPackages = [ "cmd/crawler" ];
 
-            vendorHash = "sha256-CkcdkPHqo+nIUERu0T0kyIDjHJ4CUPq4oJCN4X6dfQA=";
+            vendorHash = "sha256-/SjCI5ZfFcYZezDNDHSaKdnw8sZ7Ing9LnQY85upuQs=";
 
             doCheck = false;
 
             CGO_ENABLED = 0;
 
             preBuild = ''
-              ${pkgs.templ}/bin/templ generate
+              ${templ}/bin/templ generate
             '';
 
             ldflags = [
