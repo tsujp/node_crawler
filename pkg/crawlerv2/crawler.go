@@ -203,7 +203,11 @@ func (c *CrawlerV2) getClientInfo(
 func (c *CrawlerV2) crawlPeer(fd net.Conn) {
 	pubKey, conn, err := crawler.Accept(c.nodeKey, fd)
 	if err != nil {
-		log.Info("accept peer failed", "err", err)
+		// This happens a lot. Basically due to non-ethereum clients.
+		// if errors.Is(err, ecies.ErrInvalidMessage) {
+		// 	return
+		// }
+		log.Info("accept peer failed", "err", err, "ip", fd.RemoteAddr().String())
 		return
 	}
 	defer conn.Close()
@@ -315,45 +319,6 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 	defer conn.Close()
 
 	c.getClientInfo(conn, node, "dial")
-
-	// nodeJSON := common.NodeJSON{
-	// 	N:       node,
-	// 	EthNode: true,
-	// }
-
-	// clientInfo, err := crawler.GetClientInfo(c.nodeKey, c.genesis, c.networkID, "", node)
-	// if err != nil {
-	// 	if errors.Is(err, crawler.ErrNotEthNode) {
-	// 		nodeJSON.EthNode = false
-	// 		c.ch <- nodeJSON
-
-	// 		return
-	// 	}
-
-	// 	e := err.Error()
-	// 	if strings.Contains(e, "too many peers") {
-	// 		nodeJSON.Error = "too many peers"
-	// 	} else if strings.Contains(e, "connection reset by peer") {
-	// 		nodeJSON.Error = "connection reset by peer"
-	// 	} else if strings.Contains(e, "i/o timeout") {
-	// 		nodeJSON.Error = "i/o timeout"
-	// 	} else if strings.Contains(e, "connection refused") {
-	// 		nodeJSON.Error = "connection refused"
-	// 	} else if strings.Contains(e, "EOF") {
-	// 		nodeJSON.Error = "EOF"
-	// 	} else if strings.Contains(e, "disconnect requested") {
-	// 		nodeJSON.Error = "disconnect requested"
-	// 	} else if strings.Contains(e, "useless peer") {
-	// 		nodeJSON.Error = "useless peer"
-	// 	} else {
-	// 		log.Info("get client info failed", "node", node.ID().TerminalString(), "err", err)
-	// 		nodeJSON.Error = e
-	// 	}
-	// }
-
-	// nodeJSON.Info = clientInfo
-
-	// c.ch <- nodeJSON
 }
 
 func (c *CrawlerV2) sliceCrawler(nIDStart string, nIDEnd string) {
