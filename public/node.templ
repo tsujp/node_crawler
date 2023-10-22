@@ -123,7 +123,7 @@ templ NodeList(nodes database.NodeList) {
 					</a>
 				}
 			</div>
-			<div style="display:flex;flex-direction:row;gap:0.5em;">
+			<div style="display: flex; flex-direction: row; gap: 0.5em;">
 				<a
  					class={ 
 						pageButton(),
@@ -161,7 +161,7 @@ templ NodeList(nodes database.NodeList) {
 						<tr>
 							<td><a href={ templ.URL("/nodes/" + row.ID) }>{ row.ID[:8] }</a></td>
 							<td>{ row.ClientName }</td>
-							<td title={ row.UpdatedAt }>{ row.SinceUpdate() } ago</td>
+							<td title={ row.UpdatedAt }>{ row.SinceUpdate() }</td>
 							<td>{ row.Country }</td>
 						</tr>
 					}

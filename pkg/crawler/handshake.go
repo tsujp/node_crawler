@@ -20,13 +20,19 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/rlpx"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/node-crawler/pkg/common"
+	"github.com/ethereum/node-crawler/pkg/version"
 )
 
 var (
 	_status          *Status
 	lastStatusUpdate time.Time
 	ErrNotEthNode    = errors.New("not an eth node")
+	clientName       = version.ClientName("NodeCrawler")
 )
+
+func init() {
+	fmt.Println(clientName)
+}
 
 func GetClientInfo(pk *ecdsa.PrivateKey, genesis *core.Genesis, networkID uint64, nodeURL string, n *enode.Node) (*common.ClientInfo, error) {
 	var info common.ClientInfo
@@ -119,6 +125,7 @@ func WriteHello(conn *Conn, priv *ecdsa.PrivateKey) error {
 	pub0 := crypto.FromECDSAPub(&priv.PublicKey)[1:]
 
 	h := &Hello{
+		Name:    clientName,
 		Version: 5,
 		Caps: []p2p.Cap{
 			{Name: "eth", Version: 66},
