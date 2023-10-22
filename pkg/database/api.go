@@ -55,7 +55,7 @@ func sinceUpdate(updatedAt string) string {
 
 	since := time.Since(t)
 	if since < 0 {
-		return "In " + since.Truncate(time.Second).String()
+		return "In " + (-since).Truncate(time.Second).String()
 	}
 
 	return since.Truncate(time.Second).String() + " ago"
