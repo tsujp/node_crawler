@@ -17,7 +17,7 @@ type NodeTableHistory struct {
 
 type NodeTable struct {
 	ID             string
-	UpdatedAt      string
+	updatedAt      string
 	Enode          string
 	ClientName     string
 	RlpxVersion    string
@@ -34,7 +34,7 @@ type NodeTable struct {
 	Latitude       float64
 	Longitude      float64
 	Sequence       string
-	NextCrawl      string
+	nextCrawl      string
 
 	History []NodeTableHistory
 }
@@ -54,15 +54,28 @@ func sinceUpdate(updatedAt string) string {
 	}
 
 	since := time.Since(t)
-	return since.Truncate(time.Second).String()
+	if since < 0 {
+		return "In " + since.Truncate(time.Second).String()
+	}
+
+	return since.Truncate(time.Second).String() + " ago"
 }
 
-func (n NodeTable) SinceUpdate() string {
-	return sinceUpdate(n.UpdatedAt)
+func (n NodeTable) UpdatedAt() string {
+	if n.updatedAt == "" {
+		return "Never crawled"
+	}
+
+	since := sinceUpdate(n.updatedAt)
+	return fmt.Sprintf("%s (%s)", since, n.updatedAt)
 }
 
-func (n NodeTable) SinceNextCrawl() string {
-	return sinceUpdate(n.NextCrawl)
+func (n NodeTable) NextCrawl() string {
+	if n.nextCrawl == "" {
+		return "Never"
+	}
+
+	return fmt.Sprintf("%s (%s)", sinceUpdate(n.nextCrawl), n.nextCrawl)
 }
 
 func networkName(networkID int) string {
@@ -89,8 +102,8 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		ctx,
 		`
 			SELECT
-				crawled.id,
-				crawled.updated_at,
+				disc.id,
+				coalesce(crawled.updated_at, ''),
 				node,
 				coalesce(client_name, ''),
 				coalesce(CAST(rlpx_version AS TEXT), ''),
@@ -100,7 +113,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				coalesce(CAST(next_fork_id AS TEXT), ''),
 				coalesce(block_height, ''),
 				coalesce(head_hash, ''),
-				coalesce(ip, ''),
+				coalesce(disc.ip_address, ''),
 				coalesce(connection_type, ''),
 				coalesce(country, ''),
 				coalesce(city, ''),
@@ -108,9 +121,9 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				coalesce(longitude, 0),
 				coalesce(CAST(sequence AS TEXT), ''),
 				coalesce(next_crawl, '')
-			FROM crawled_nodes AS crawled
-			JOIN discovered_nodes AS disc ON (crawled.id = disc.id)
-			WHERE crawled.id = ?
+			FROM discovered_nodes AS disc
+			LEFT JOIN crawled_nodes AS crawled ON (disc.id = crawled.id)
+			WHERE disc.id = ?;
 		`,
 		nodeID,
 	)
@@ -119,7 +132,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 
 	err := row.Scan(
 		&nodePage.ID,
-		&nodePage.UpdatedAt,
+		&nodePage.updatedAt,
 		&nodePage.Enode,
 		&nodePage.ClientName,
 		&nodePage.RlpxVersion,
@@ -136,7 +149,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		&nodePage.Latitude,
 		&nodePage.Longitude,
 		&nodePage.Sequence,
-		&nodePage.NextCrawl,
+		&nodePage.nextCrawl,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("row scan failed: %w", err)

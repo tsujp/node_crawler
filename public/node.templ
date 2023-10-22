@@ -19,7 +19,7 @@ templ NodeTable(nt database.NodeTable) {
 				</tr>
 				<tr>
 					<td>Last Update</td>
-					<td>{ nt.SinceUpdate() } ago ({ nt.UpdatedAt })</td>
+					<td>{ nt.UpdatedAt() }</td>
 				</tr>
 				<tr>
 					<td>Enode</td>
@@ -75,7 +75,7 @@ templ NodeTable(nt database.NodeTable) {
 				</tr>
 				<tr>
 					<td>Next Crawl (Scheduled)</td>
-					<td>{ nt.SinceNextCrawl() } ago ({ nt.NextCrawl })</td>
+					<td>{ nt.NextCrawl() }</td>
 				</tr>
 			</tbody>
 		</table>
