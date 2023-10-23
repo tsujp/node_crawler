@@ -122,11 +122,16 @@ func (c *CrawlerV2) getClientInfo(
 ) {
 	err := crawler.WriteHello(conn, c.nodeKey)
 	if err != nil {
+		known, errStr := translateError(err)
+		if !known {
+			log.Info("write hello failed", "err", err)
+		}
+
 		c.ch <- common.NodeJSON{
 			N:         node,
 			EthNode:   true,
 			Direction: direction,
-			Error:     fmt.Errorf("write hello: %w", err).Error(),
+			Error:     errStr,
 		}
 
 		return
@@ -196,7 +201,12 @@ func (c *CrawlerV2) getClientInfo(
 	} else if disconnect != nil {
 		nodeJSON.Error = disconnect.Reason.String()
 	} else if readError != nil {
-		nodeJSON.Error = readError.String()
+		known, errStr := translateError(readError)
+		if !known {
+			log.Info("message read error", "err", readError)
+		}
+
+		nodeJSON.Error = errStr
 	}
 
 	c.ch <- nodeJSON
@@ -205,11 +215,11 @@ func (c *CrawlerV2) getClientInfo(
 func (c *CrawlerV2) crawlPeer(fd net.Conn) {
 	pubKey, conn, err := crawler.Accept(c.nodeKey, fd)
 	if err != nil {
-		// This happens a lot. Basically due to non-ethereum clients.
-		// if errors.Is(err, ecies.ErrInvalidMessage) {
-		// 	return
-		// }
-		log.Info("accept peer failed", "err", err, "ip", fd.RemoteAddr().String())
+		known, _ := translateError(err)
+		if !known {
+			log.Info("accept peer failed", "err", err, "ip", fd.RemoteAddr().String())
+		}
+
 		return
 	}
 	defer conn.Close()
@@ -293,33 +303,41 @@ func (c *CrawlerV2) updaterLoop() {
 	}
 }
 
+func translateError(err error) (bool, string) {
+	switch errStr := err.Error(); {
+	case strings.Contains(errStr, "i/o timeout"):
+		return true, "i/o timeout"
+	case strings.Contains(errStr, "connection reset by peer"):
+		return true, "connection reset by peer"
+	case strings.Contains(errStr, "EOF"):
+		return true, "EOF"
+	case strings.Contains(errStr, "no route to host"):
+		return true, "no route to host"
+	case strings.Contains(errStr, "connection refused"):
+		return true, "connection refused"
+	case strings.Contains(errStr, "network is unreachable"):
+		return true, "network is unreachable"
+	case strings.Contains(errStr, "invalid message"):
+		return true, "invalid message"
+	default:
+		return false, errStr
+	}
+}
+
 func (c *CrawlerV2) crawlNode(node *enode.Node) {
 	conn, err := crawler.Dial(c.nodeKey, node, 10*time.Second)
 	if err != nil {
-		nodeJson := common.NodeJSON{
+		known, errStr := translateError(err)
+		if !known {
+			log.Info("dial failed", "err", err)
+		}
+
+		c.ch <- common.NodeJSON{
 			N:         node,
 			EthNode:   true,
 			Direction: "dial",
+			Error:     errStr,
 		}
-		switch errStr := err.Error(); {
-		case strings.Contains(errStr, "i/o timeout"):
-			nodeJson.Error = "i/o timeout"
-		case strings.Contains(errStr, "connection reset by peer"):
-			nodeJson.Error = "connection reset by peer"
-		case strings.Contains(errStr, "EOF"):
-			nodeJson.Error = "EOF"
-		case strings.Contains(errStr, "no route to host"):
-			nodeJson.Error = "no route to host"
-		case strings.Contains(errStr, "connection refused"):
-			nodeJson.Error = "connection refused"
-		case strings.Contains(errStr, "network is unreachable"):
-			nodeJson.Error = "network is unreachable"
-		default:
-			log.Info("dial failed", "err", err)
-			nodeJson.Error = errStr
-		}
-
-		c.ch <- nodeJson
 
 		return
 	}
