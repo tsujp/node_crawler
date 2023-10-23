@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/node-crawler/pkg/metrics"
 	"github.com/oschwald/geoip2-golang"
 )
 
@@ -75,6 +77,59 @@ func (d *DB) CreateTables() error {
 	}
 
 	return nil
+}
+
+func (db *DB) getTableStats() (int, int, int, error) {
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("total_disc_nodes", time.Since(start), err)
+
+	rows, err := db.QueryRetryBusy(`
+		SELECT
+			(SELECT COUNT(*) FROM discovered_nodes),
+			(SELECT COUNT(*) FROM discovered_nodes WHERE next_crawl < CURRENT_TIMESTAMP),
+			(SELECT COUNT(*) FROM crawled_nodes)
+	`)
+	if err != nil {
+		return -1, -1, -1, fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var totalDisc, toCrawl, totalCrawled int
+
+	for rows.Next() {
+		err = rows.Scan(&totalDisc, &toCrawl, &totalCrawled)
+		if err != nil {
+			return -1, -1, -1, fmt.Errorf("scan failed: %w", err)
+		}
+
+		return totalDisc, toCrawl, totalCrawled, nil
+	}
+
+	return -1, -1, -1, sql.ErrNoRows
+}
+
+// Meant to be run as a goroutine
+//
+// Periodically collects the table stat metrics
+func (db *DB) TableStatsMetricsDaemon(frequency time.Duration) {
+	for {
+		next := time.Now().Add(frequency)
+
+		totalDisc, toCrawl, totalCrawled, err := db.getTableStats()
+		if err != nil {
+			log.Error("get table stats failed", "err", err)
+
+			continue
+		}
+
+		metrics.TableStatsCrawledNodeCount.Set(float64(totalCrawled))
+		metrics.TableStatsDiscNodes.Set(float64(totalDisc))
+		metrics.TableStatsNodesToCrawl.Set(float64(toCrawl))
+
+		time.Sleep(time.Until(next))
+	}
 }
 
 func (d *DB) ExecRetryBusy(query string, args ...any) (sql.Result, error) {

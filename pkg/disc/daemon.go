@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/node-crawler/pkg/database"
+	"github.com/ethereum/node-crawler/pkg/metrics"
 )
 
 type Discovery struct {
@@ -107,11 +108,13 @@ func (d *Discovery) Wait() {
 	d.wg.Wait()
 }
 
-func (d *Discovery) discLoop(iter enode.Iterator, ch chan<- *enode.Node) {
+func (d *Discovery) discLoop(iter enode.Iterator, discVersion string, ch chan<- *enode.Node) {
 	defer d.wg.Done()
 
 	for iter.Next() {
 		ch <- iter.Node()
+
+		metrics.DiscUpdateCount.WithLabelValues(discVersion).Inc()
 	}
 }
 
@@ -119,6 +122,8 @@ func (d *Discovery) updaterLoop(ch <-chan *enode.Node) {
 	defer d.wg.Done()
 
 	for {
+		metrics.DiscUpdateBacklog.Set(float64(len(ch)))
+
 		node := <-ch
 
 		err := d.db.UpsertNode(node)
@@ -138,8 +143,8 @@ func (d *Discovery) StartDaemon() error {
 	ch := make(chan *enode.Node, 64)
 
 	d.wg.Add(3)
-	go d.discLoop(d.v4.RandomNodes(), ch)
-	go d.discLoop(d.v5.RandomNodes(), ch)
+	go d.discLoop(d.v4.RandomNodes(), "v4", ch)
+	go d.discLoop(d.v5.RandomNodes(), "v5", ch)
 	go d.updaterLoop(ch)
 
 	return nil

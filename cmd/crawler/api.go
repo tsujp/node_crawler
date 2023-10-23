@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/node-crawler/pkg/apidb"
 	"github.com/ethereum/node-crawler/pkg/crawlerdb"
 	"github.com/ethereum/node-crawler/pkg/database"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
 )
 
@@ -29,15 +31,16 @@ var (
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
 			&dropNodesTimeFlag,
+			&metricsAddress,
 		},
 	}
 )
 
-func startAPI(ctx *cli.Context) error {
-	autovacuum := ctx.String(autovacuumFlag.Name)
-	busyTimeout := ctx.Uint64(busyTimeoutFlag.Name)
+func startAPI(cCtx *cli.Context) error {
+	autovacuum := cCtx.String(autovacuumFlag.Name)
+	busyTimeout := cCtx.Uint64(busyTimeoutFlag.Name)
 
-	apiDBPath := ctx.String(apiDBFlag.Name)
+	apiDBPath := cCtx.String(apiDBFlag.Name)
 	shouldInit := false
 	if _, err := os.Stat(apiDBPath); os.IsNotExist(err) {
 		shouldInit = true
@@ -58,9 +61,9 @@ func startAPI(ctx *cli.Context) error {
 	}
 
 	sqlite, err := initDB(
-		crawlerDBFlag.Get(ctx)+"_v2",
-		autovacuumFlag.Get(ctx),
-		busyTimeoutFlag.Get(ctx),
+		crawlerDBFlag.Get(cCtx)+"_v2",
+		autovacuumFlag.Get(cCtx),
+		busyTimeoutFlag.Get(cCtx),
 	)
 	if err != nil {
 		return fmt.Errorf("init db failed: %w", err)
@@ -77,9 +80,16 @@ func startAPI(ctx *cli.Context) error {
 	// go dropDeamon(&wg, nodeDB, ctx.Duration(dropNodesTimeFlag.Name))
 
 	// Start the API deamon
-	apiAddress := ctx.String(apiListenAddrFlag.Name)
+	apiAddress := cCtx.String(apiListenAddrFlag.Name)
 	apiDeamon := api.New(apiAddress, nodeDB, dbv2)
 	go apiDeamon.HandleRequests(&wg)
+
+	// Start metrics server
+	metricsAddr := metricsAddress.Get(cCtx)
+	log.Info("starting metrics server", "address", metricsAddr)
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(metricsAddr, nil)
+
 	wg.Wait()
 
 	return nil

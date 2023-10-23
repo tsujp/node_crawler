@@ -176,8 +176,9 @@ func (a *Api) HandleRequests(wg *sync.WaitGroup) {
 	router.HandleFunc("/v1/dashboard", a.handleDashboard)
 	router.HandleFunc("/nodes", a.nodesListHandler)
 	router.HandleFunc("/nodes/{id}", a.nodesHandler)
+
 	log.Info("Starting API", "address", a.address)
-	http.ListenAndServe(a.address, router)
+	_ = http.ListenAndServe(a.address, router)
 }
 
 type client struct {

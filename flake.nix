@@ -54,14 +54,14 @@
         };
 
         packages = {
-          nodeCrawler = pkgs.buildGo121Module rec {
+          nodeCrawler = pkgs.buildGo121Module {
             pname = "crawler";
             version = "0.0.0";
 
             src = gitignoreSource ./.;
             subPackages = [ "cmd/crawler" ];
 
-            vendorHash = "sha256-/SjCI5ZfFcYZezDNDHSaKdnw8sZ7Ing9LnQY85upuQs=";
+            vendorHash = "sha256-6iq3MrY8I8/+ao/PIKGvrFRY8dzm2/ZD+lE2GxyD08s=";
 
             doCheck = false;
 
@@ -77,7 +77,7 @@
               "-extldflags -static"
             ];
           };
-          nodeCrawlerFrontend = pkgs.buildNpmPackage rec {
+          nodeCrawlerFrontend = pkgs.buildNpmPackage {
             pname = "frontend";
             version = "0.0.0";
 
@@ -192,6 +192,12 @@
                 default = 10000;
                 description = "Listen port for the API server.";
               };
+
+              metricsAddress = mkOption {
+                type = types.str;
+                default = "0.0.0.0:9190";
+                description = "Address on which the metrics server listens. This is NOT added to the firewall.";
+              };
             };
 
             crawler = {
@@ -234,6 +240,12 @@
                 default = 16;
                 description = "Number of crawler workers to start.";
               };
+
+              metricsAddress = mkOption {
+                type = types.str;
+                default = "0.0.0.0:9191";
+                description = "Address on which the metrics server listens. This is NOT added to the firewall.";
+              };
             };
           };
 
@@ -256,6 +268,7 @@
                       "--crawler-db=${cfg.crawlerDatabaseName}"
                       "--geoipdb=${cfg.crawler.geoipdb}"
                       "--workers=${toString cfg.crawler.workers}"
+                      "--metrics-addr=${cfg.crawler.metricsAddress}"
                     ]
                     ++ optional (cfg.crawler.network == "goerli") "--goerli"
                     ++ optional (cfg.crawler.network == "holesky") "--holesky"
@@ -283,9 +296,10 @@
                   ExecStart =
                   let
                     args = [
-                      "--addr=${apiAddress}"
+                      "--api-addr=${apiAddress}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
                       "--api-db=${cfg.apiDatabaseName}"
+                      "--metrics-addr=${cfg.api.metricsAddress}"
                     ];
                   in
                   "${pkgs.nodeCrawler}/bin/crawler api ${concatStringsSep " " args}";

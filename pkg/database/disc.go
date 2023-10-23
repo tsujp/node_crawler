@@ -2,13 +2,20 @@ package database
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/node-crawler/pkg/common"
+	"github.com/ethereum/node-crawler/pkg/metrics"
 )
 
 func (d *DB) UpsertNode(node *enode.Node) error {
-	_, err := d.ExecRetryBusy(
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("disc_upsert_node", time.Since(start), err)
+
+	_, err = d.ExecRetryBusy(
 		`
 			INSERT INTO discovered_nodes (
 				id,
@@ -49,6 +56,11 @@ func (d *DB) SelectDiscoveredNodeSlice(
 	nIDEnd string,
 	limit int,
 ) ([]*enode.Node, error) {
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("select_disc_node_slice", time.Since(start), err)
+
 	rows, err := d.db.Query(
 		`
 			SELECT

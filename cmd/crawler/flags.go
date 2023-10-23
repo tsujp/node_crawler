@@ -13,7 +13,7 @@ var (
 		Required: true,
 	}
 	apiListenAddrFlag = cli.StringFlag{
-		Name:  "addr",
+		Name:  "api-addr",
 		Usage: "Listening address",
 		Value: "0.0.0.0:10000",
 	}
@@ -50,7 +50,7 @@ var (
 		Usage: "geoip2 database location",
 	}
 	listenAddrFlag = cli.StringFlag{
-		Name:  "addr",
+		Name:  "node-addr",
 		Usage: "Listening address",
 		Value: "0.0.0.0:30303",
 	}
@@ -81,5 +81,10 @@ var (
 		Name:  "workers",
 		Usage: "Number of workers to start for updating nodes",
 		Value: 16,
+	}
+	metricsAddress = cli.StringFlag{
+		Name:  "metrics-addr",
+		Usage: "Address for the metrics server",
+		Value: "0.0.0.0:9191",
 	}
 )

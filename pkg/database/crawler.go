@@ -4,8 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/ethereum/node-crawler/pkg/common"
+	"github.com/ethereum/node-crawler/pkg/metrics"
 )
 
 type location struct {
@@ -34,7 +36,12 @@ func (db *DB) IPToLocation(ip net.IP) (location, error) {
 }
 
 func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
-	_, err := db.ExecRetryBusy(
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("update_crawled_node_fail", time.Since(start), err)
+
+	_, err = db.ExecRetryBusy(
 		`
 			INSERT INTO discovered_nodes (
 				id,
@@ -82,7 +89,12 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 }
 
 func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
-	_, err := db.ExecRetryBusy(
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("update_crawled_node_not_eth", time.Since(start), err)
+
+	_, err = db.ExecRetryBusy(
 		`
 			INSERT INTO discovered_nodes (
 				id,
@@ -115,24 +127,11 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 	return nil
 }
 
-func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
-	if !node.EthNode {
-		err := db.UpdateNotEthNode(node)
-		if err != nil {
-			return fmt.Errorf("update not eth node failed: %w", err)
-		}
+func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
+	var err error
 
-		return nil
-	}
-
-	if node.Error != "" {
-		err := db.UpdateCrawledNodeFail(node)
-		if err != nil {
-			return fmt.Errorf("update failed crawl failed: %w", err)
-		}
-
-		return nil
-	}
+	start := time.Now()
+	defer metrics.ObserveDBQuery("update_crawled_node_success", time.Since(start), err)
 
 	info := node.GetInfo()
 	ip := node.N.IP()
@@ -258,4 +257,26 @@ func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
 	}
 
 	return nil
+}
+
+func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
+	if !node.EthNode {
+		err := db.UpdateNotEthNode(node)
+		if err != nil {
+			return fmt.Errorf("update not eth node failed: %w", err)
+		}
+
+		return nil
+	}
+
+	if node.Error != "" {
+		err := db.UpdateCrawledNodeFail(node)
+		if err != nil {
+			return fmt.Errorf("update failed crawl failed: %w", err)
+		}
+
+		return nil
+	}
+
+	return db.UpdateCrawledNodeSuccess(node)
 }

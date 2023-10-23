@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/crawler"
 	"github.com/ethereum/node-crawler/pkg/database"
+	"github.com/ethereum/node-crawler/pkg/metrics"
 )
 
 func nodeIDString(start string, c byte) string {
@@ -65,9 +66,9 @@ func NewCrawlerV2(
 	}
 
 	switch workers {
-	case 1, 2, 4, 8, 16:
+	case 1, 2, 4, 8, 16, 32:
 	default:
-		return nil, fmt.Errorf("num crawlers: %d not in 1,2,4,8,16", workers)
+		return nil, fmt.Errorf("num crawlers: %d not in 1,2,4,8,16,32", workers)
 	}
 
 	c.wg = new(sync.WaitGroup)
@@ -190,6 +191,7 @@ func (c *CrawlerV2) getClientInfo(
 
 	if !ethNode {
 		c.ch <- nodeJSON
+
 		return
 	} else if disconnect != nil {
 		nodeJSON.Error = disconnect.Reason.String()
@@ -279,12 +281,18 @@ func (c *CrawlerV2) updaterLoop() {
 	c.wg.Done()
 
 	for {
+		metrics.NodeUpdateBacklog.Set(float64(len(c.ch)))
 		node := <-c.ch
 
 		err := c.db.UpsertCrawledNode(node)
 		if err != nil {
 			log.Error("upsert crawled node failed", "err", err, "node_id", node.ID())
 		}
+
+		metrics.NodeUpdateInc(
+			node.Direction,
+			!node.EthNode || node.Error != "",
+		)
 	}
 }
 

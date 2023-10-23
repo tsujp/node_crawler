@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/node-crawler/pkg/metrics"
 )
 
 type NodeTableHistory struct {
@@ -98,6 +99,11 @@ func (n NodeTable) NetworkName() string {
 }
 
 func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, error) {
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("get_node_table", time.Since(start), err)
+
 	row := db.db.QueryRowContext(
 		ctx,
 		`
@@ -130,7 +136,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 
 	nodePage := new(NodeTable)
 
-	err := row.Scan(
+	err = row.Scan(
 		&nodePage.ID,
 		&nodePage.updatedAt,
 		&nodePage.Enode,
@@ -228,6 +234,11 @@ func (l NodeList) NPages() int {
 }
 
 func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int) (*NodeList, error) {
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("get_node_list", time.Since(start), err)
+
 	pageSize := 10
 	offset := (pageNumber - 1) * pageSize
 

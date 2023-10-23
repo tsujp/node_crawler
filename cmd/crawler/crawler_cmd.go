@@ -22,12 +22,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 
 	"github.com/oschwald/geoip2-golang"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -57,10 +60,11 @@ var (
 			&crawlerDBFlag,
 			&geoipdbFlag,
 			&listenAddrFlag,
+			&metricsAddress,
 			&nodeFileFlag,
+			&nodeKeyFileFlag,
 			&nodeURLFlag,
 			&nodedbFlag,
-			&nodeKeyFileFlag,
 			&timeoutFlag,
 			&workersFlag,
 			utils.GoerliFlag,
@@ -191,6 +195,14 @@ func crawlNodesV2(cCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("start crawler v2 failed: %w", err)
 	}
+
+	go db.TableStatsMetricsDaemon(1 * time.Minute)
+
+	// Start metrics server
+	metricsAddr := metricsAddress.Get(cCtx)
+	log.Info("starting metrics server", "address", metricsAddr)
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(metricsAddr, nil)
 
 	disc.Wait()
 	crawler.Wait()

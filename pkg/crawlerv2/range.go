@@ -7,6 +7,25 @@ type nodeIDRange struct {
 	end   string
 }
 
+func range32() []nodeIDRange {
+	out := make([]nodeIDRange, 32)
+
+	for i := 0; i < 16; i++ {
+		prefix := string([]byte{hexAlpha[i]})
+
+		out[i*2] = nodeIDRange{
+			start: nodeIDString(prefix+"0", '0'),
+			end:   nodeIDString(prefix+"7", 'f'),
+		}
+		out[i*2+1] = nodeIDRange{
+			start: nodeIDString(prefix+"8", '0'),
+			end:   nodeIDString(prefix+"f", 'f'),
+		}
+	}
+
+	return out
+}
+
 func range16() []nodeIDRange {
 	out := make([]nodeIDRange, 16)
 
@@ -88,6 +107,8 @@ func rangeN(n uint64) []nodeIDRange {
 		return range8()
 	case 16:
 		return range16()
+	case 32:
+		return range32()
 	default:
 		panic("invalid num crawler range")
 	}
