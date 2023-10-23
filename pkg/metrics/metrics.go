@@ -50,6 +50,7 @@ var (
 		[]string{
 			"direction",
 			"status",
+			"error",
 		},
 	)
 	TableStatsDiscNodes = promauto.NewGauge(prometheus.GaugeOpts{
@@ -87,9 +88,10 @@ func ObserveDBQuery(queryName string, duration time.Duration, err error) {
 	}).Observe(duration.Seconds())
 }
 
-func NodeUpdateInc(direction string, isErr bool) {
+func NodeUpdateInc(direction string, err string) {
 	nodeUpdateCount.With(prometheus.Labels{
 		"direction": direction,
-		"status":    boolToStatus(!isErr),
+		"status":    boolToStatus(err == ""),
+		"error":     err,
 	}).Inc()
 }

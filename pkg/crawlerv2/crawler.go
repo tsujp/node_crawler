@@ -126,6 +126,7 @@ func (c *CrawlerV2) getClientInfo(
 			N:         node,
 			EthNode:   true,
 			Direction: direction,
+			Error:     fmt.Errorf("write hello: %w", err).Error(),
 		}
 
 		return
@@ -133,8 +134,13 @@ func (c *CrawlerV2) getClientInfo(
 
 	var disconnect *crawler.Disconnect = nil
 	var readError *crawler.Error = nil
-	info := common.ClientInfo{}
-	ethNode := true
+
+	nodeJSON := common.NodeJSON{
+		N:         node,
+		EthNode:   true,
+		Info:      &common.ClientInfo{},
+		Direction: direction,
+	}
 
 	loop := true
 	for loop {
@@ -147,14 +153,15 @@ func (c *CrawlerV2) getClientInfo(
 			if msg.Version >= 5 {
 				conn.SetSnappy(true)
 			}
-			info.Capabilities = msg.Caps
-			info.RLPxVersion = msg.Version
-			info.ClientName = msg.Name
+			nodeJSON.Info.Capabilities = msg.Caps
+			nodeJSON.Info.RLPxVersion = msg.Version
+			nodeJSON.Info.ClientName = msg.Name
 
-			conn.NegotiateEthProtocol(info.Capabilities)
+			conn.NegotiateEthProtocol(nodeJSON.Info.Capabilities)
 
 			if conn.NegotiatedProtoVersion == 0 {
-				ethNode = false
+				nodeJSON.Error = "not eth node"
+				nodeJSON.EthNode = false
 				_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscUselessPeer})
 
 				loop = false
@@ -164,9 +171,9 @@ func (c *CrawlerV2) getClientInfo(
 
 			_ = conn.Write(c.status)
 		case *crawler.Status:
-			info.ForkID = msg.ForkID
-			info.HeadHash = msg.Head
-			info.NetworkID = msg.NetworkID
+			nodeJSON.Info.ForkID = msg.ForkID
+			nodeJSON.Info.HeadHash = msg.Head
+			nodeJSON.Info.NetworkID = msg.NetworkID
 
 			_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscQuitting})
 
@@ -178,18 +185,11 @@ func (c *CrawlerV2) getClientInfo(
 			readError = msg
 			loop = false
 		default:
-			log.Error("message type not handled", "msg", msg)
+			log.Info("message type not handled", "msg", msg)
 		}
 	}
 
-	nodeJSON := common.NodeJSON{
-		N:         node,
-		EthNode:   ethNode,
-		Info:      &info,
-		Direction: direction,
-	}
-
-	if !ethNode {
+	if !nodeJSON.EthNode {
 		c.ch <- nodeJSON
 
 		return
@@ -289,10 +289,7 @@ func (c *CrawlerV2) updaterLoop() {
 			log.Error("upsert crawled node failed", "err", err, "node_id", node.ID())
 		}
 
-		metrics.NodeUpdateInc(
-			node.Direction,
-			!node.EthNode || node.Error != "",
-		)
+		metrics.NodeUpdateInc(node.Direction, node.Error)
 	}
 }
 
@@ -315,6 +312,8 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 			nodeJson.Error = "no route to host"
 		case strings.Contains(errStr, "connection refused"):
 			nodeJson.Error = "connection refused"
+		case strings.Contains(errStr, "network is unreachable"):
+			nodeJson.Error = "network is unreachable"
 		default:
 			log.Info("dial failed", "err", err)
 			nodeJson.Error = errStr
@@ -355,6 +354,6 @@ func (c *CrawlerV2) sliceCrawler(nIDStart string, nIDEnd string) {
 		}
 
 		// Wait for database updater to catch up a bit
-		time.Sleep(time.Minute)
+		time.Sleep(10 * time.Second)
 	}
 }
