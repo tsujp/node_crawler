@@ -294,7 +294,7 @@ func (c *CrawlerV2) updaterLoop() {
 }
 
 func (c *CrawlerV2) crawlNode(node *enode.Node) {
-	conn, err := crawler.Dial(c.nodeKey, node)
+	conn, err := crawler.Dial(c.nodeKey, node, 10*time.Second)
 	if err != nil {
 		nodeJson := common.NodeJSON{
 			N:         node,
@@ -302,12 +302,12 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 			Direction: "dial",
 		}
 		switch errStr := err.Error(); {
+		case strings.Contains(errStr, "i/o timeout"):
+			nodeJson.Error = "i/o timeout"
 		case strings.Contains(errStr, "connection reset by peer"):
 			nodeJson.Error = "connection reset by peer"
 		case strings.Contains(errStr, "EOF"):
 			nodeJson.Error = "EOF"
-		case strings.Contains(errStr, "i/o timeout"):
-			nodeJson.Error = "i/o timeout"
 		case strings.Contains(errStr, "no route to host"):
 			nodeJson.Error = "no route to host"
 		case strings.Contains(errStr, "connection refused"):

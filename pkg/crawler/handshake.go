@@ -37,7 +37,7 @@ func init() {
 func GetClientInfo(pk *ecdsa.PrivateKey, genesis *core.Genesis, networkID uint64, nodeURL string, n *enode.Node) (*common.ClientInfo, error) {
 	var info common.ClientInfo
 
-	conn, err := Dial(pk, n)
+	conn, err := Dial(pk, n, 15*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("dail failed: %w", err)
 	}
@@ -99,10 +99,10 @@ func Accept(pk *ecdsa.PrivateKey, fd net.Conn) (*ecdsa.PublicKey, *Conn, error) 
 }
 
 // Dial attempts to Dial the given node and perform a handshake,
-func Dial(pk *ecdsa.PrivateKey, n *enode.Node) (*Conn, error) {
+func Dial(pk *ecdsa.PrivateKey, n *enode.Node, timeout time.Duration) (*Conn, error) {
 	var conn Conn
 
-	fd, err := net.DialTimeout("tcp", fmt.Sprintf("[%s]:%d", n.IP(), n.TCP()), 15*time.Second)
+	fd, err := net.DialTimeout("tcp", fmt.Sprintf("[%s]:%d", n.IP(), n.TCP()), timeout)
 	if err != nil {
 		return nil, err
 	}
