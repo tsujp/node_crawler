@@ -52,6 +52,8 @@ func (d *DB) CreateTables() error {
 
 		CREATE INDEX IF NOT EXISTS id_next_crawl
 			ON discovered_nodes (id, next_crawl);
+		CREATE INDEX IF NOT EXISTS discovered_nodes_next_crawl_node
+			ON discovered_nodes (next_crawl, node);
 
 		CREATE TABLE IF NOT EXISTS crawled_nodes (
 			id				TEXT		PRIMARY KEY,

@@ -382,6 +382,8 @@ func (c *CrawlerV2) nodesToCrawlDaemon(batchSize int) {
 				c.toCrawl <- node
 			}
 		}
+
+		time.Sleep(10 * time.Second)
 	}
 }
 
