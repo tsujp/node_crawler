@@ -87,4 +87,19 @@ var (
 		Usage: "Address for the metrics server",
 		Value: "0.0.0.0:9191",
 	}
+	nextCrawlSuccess = cli.DurationFlag{
+		Name:  "next-crawl-success",
+		Usage: "Next crawl value if the crawl was successful",
+		Value: 12 * time.Hour,
+	}
+	nextCrawlFail = cli.DurationFlag{
+		Name:  "next-crawl-fail",
+		Usage: "Next crawl value if the crawl was unsuccessful",
+		Value: 48 * time.Hour,
+	}
+	nextCrawlNotEth = cli.DurationFlag{
+		Name:  "next-crawl-not-eth",
+		Usage: "Next crawl value if the node was not an eth node",
+		Value: 14 * 24 * time.Hour,
+	}
 )

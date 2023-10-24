@@ -246,6 +246,24 @@
                 default = "0.0.0.0:9191";
                 description = "Address on which the metrics server listens. This is NOT added to the firewall.";
               };
+
+              nextCrawlSuccess = mkOption {
+                type = types.str;
+                default = "12h";
+                description = "Next crawl value if the crawl was successful.";
+              };
+
+              nextCrawlFail = mkOption {
+                type = types.str;
+                default = "48h";
+                description = "Next crawl value if the crawl was unsuccessful.";
+              };
+
+              nextCrawlNotEth = mkOption {
+                type = types.str;
+                default = "14d";
+                description = "Next crawl value if the node was not an eth node.";
+              };
             };
           };
 
@@ -269,6 +287,9 @@
                       "--geoipdb=${cfg.crawler.geoipdb}"
                       "--workers=${toString cfg.crawler.workers}"
                       "--metrics-addr=${cfg.crawler.metricsAddress}"
+                      "--next-crawl-success=${cfg.crawler.nextCrawlSuccess}"
+                      "--next-crawl-fail=${cfg.crawler.nextCrawlFail}"
+                      "--next-crawl-not-eth=${cfg.crawler.nextCrawlNotEth}"
                     ]
                     ++ optional (cfg.crawler.network == "goerli") "--goerli"
                     ++ optional (cfg.crawler.network == "holesky") "--holesky"

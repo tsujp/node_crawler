@@ -56,7 +56,7 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 				?3,
 				CURRENT_TIMESTAMP,
 				CURRENT_TIMESTAMP,
-				datetime(CURRENT_TIMESTAMP, '+48 hours')
+				datetime(CURRENT_TIMESTAMP, ?6)
 			)
 			ON CONFLICT (id) DO UPDATE
 			SET
@@ -80,6 +80,7 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 		node.N.IP().String(),
 		node.Direction,
 		node.Error,
+		db.nextCrawlFail,
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)
@@ -109,7 +110,7 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 				?3,
 				CURRENT_TIMESTAMP,
 				CURRENT_TIMESTAMP,
-				datetime(CURRENT_TIMESTAMP, '+14 days')
+				datetime(CURRENT_TIMESTAMP, ?4)
 			)
 			ON CONFLICT (id) DO UPDATE
 			SET
@@ -119,6 +120,7 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 		node.ID(),
 		node.N.String(),
 		node.N.IP().String(),
+		db.nextCrawlNotEth,
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)
@@ -214,7 +216,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				?10,
 				CURRENT_TIMESTAMP,
 				CURRENT_TIMESTAMP,
-				datetime(CURRENT_TIMESTAMP, '+12 hours')
+				datetime(CURRENT_TIMESTAMP, ?19)
 			)
 			ON CONFLICT (id) DO UPDATE
 			SET
@@ -251,6 +253,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 		node.N.Seq(),
 		node.N.String(),
 		node.Direction,
+		db.nextCrawlSucces,
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)

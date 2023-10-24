@@ -70,7 +70,7 @@ func startAPI(cCtx *cli.Context) error {
 	}
 	defer sqlite.Close()
 
-	dbv2 := database.NewDB(sqlite, nil)
+	dbv2 := database.NewDB(sqlite, nil, 0, 0, 0)
 
 	var wg sync.WaitGroup
 	wg.Add(3)

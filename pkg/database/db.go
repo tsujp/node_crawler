@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,12 +16,26 @@ import (
 type DB struct {
 	db      *sql.DB
 	geoipDB *geoip2.Reader
+
+	nextCrawlSucces string
+	nextCrawlFail   string
+	nextCrawlNotEth string
 }
 
-func NewDB(db *sql.DB, geoipDB *geoip2.Reader) *DB {
+func NewDB(
+	db *sql.DB,
+	geoipDB *geoip2.Reader,
+	nextCrawlSucces time.Duration,
+	nextCrawlFail time.Duration,
+	nextCrawlNotEth time.Duration,
+) *DB {
 	return &DB{
 		db:      db,
 		geoipDB: geoipDB,
+
+		nextCrawlSucces: strconv.Itoa(int(nextCrawlSucces.Seconds())) + " seconds",
+		nextCrawlFail:   strconv.Itoa(int(nextCrawlFail.Seconds())) + " seconds",
+		nextCrawlNotEth: strconv.Itoa(int(nextCrawlNotEth.Seconds())) + " seconds",
 	}
 }
 

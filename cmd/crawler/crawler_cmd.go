@@ -61,6 +61,9 @@ var (
 			&geoipdbFlag,
 			&listenAddrFlag,
 			&metricsAddress,
+			&nextCrawlFail,
+			&nextCrawlNotEth,
+			&nextCrawlSuccess,
 			&nodeFileFlag,
 			&nodeKeyFileFlag,
 			&nodeURLFlag,
@@ -156,7 +159,13 @@ func crawlNodesV2(cCtx *cli.Context) error {
 		defer func() { _ = geoipDB.Close() }()
 	}
 
-	db := database.NewDB(sqlite, geoipDB)
+	db := database.NewDB(
+		sqlite,
+		geoipDB,
+		nextCrawlSuccess.Get(cCtx),
+		nextCrawlFail.Get(cCtx),
+		nextCrawlNotEth.Get(cCtx),
+	)
 
 	err = db.CreateTables()
 	if err != nil {
