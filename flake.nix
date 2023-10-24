@@ -181,6 +181,12 @@
                 description = "Enables the Node Crawler API server.";
               };
 
+              pprof = mkOption {
+                type = types.bool;
+                default = false;
+                description = "Enable the pprof http server";
+              };
+
               address = mkOption {
                 type = types.str;
                 default = "127.0.0.1";
@@ -205,6 +211,12 @@
                 default = true;
                 type = types.bool;
                 description = "Enables the Node Crawler API server.";
+              };
+
+              pprof = mkOption {
+                type = types.bool;
+                default = false;
+                description = "Enable the pprof http server";
               };
 
               geoipdb = mkOption {
@@ -295,7 +307,7 @@
                     ++ optional (cfg.crawler.network == "holesky") "--holesky"
                     ++ optional (cfg.crawler.network == "sepolia") "--sepolia";
                   in
-                  "${pkgs.nodeCrawler}/bin/crawler crawl ${concatStringsSep " " args}";
+                  "${pkgs.nodeCrawler}/bin/crawler --pprof=${cfg.crawler.pprof} crawl ${concatStringsSep " " args}";
 
                   WorkingDirectory = cfg.stateDir;
                   StateDirectory = optional (cfg.stateDir == /var/lib/node_crawler) "node_crawler";
@@ -323,7 +335,7 @@
                       "--metrics-addr=${cfg.api.metricsAddress}"
                     ];
                   in
-                  "${pkgs.nodeCrawler}/bin/crawler api ${concatStringsSep " " args}";
+                  "${pkgs.nodeCrawler}/bin/crawler --pprof=${cfg.crawler.pprof} api ${concatStringsSep " " args}";
 
                   WorkingDirectory = cfg.stateDir;
                   StateDirectory = optional (cfg.stateDir == /var/lib/node_crawler) "node_crawler";
