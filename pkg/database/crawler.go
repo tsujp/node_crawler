@@ -56,7 +56,7 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 				?3,
 				CURRENT_TIMESTAMP,
 				CURRENT_TIMESTAMP,
-				datetime(CURRENT_TIMESTAMP, '+3 days')
+				datetime(CURRENT_TIMESTAMP, '+48 hours')
 			)
 			ON CONFLICT (id) DO UPDATE
 			SET
@@ -214,7 +214,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				?10,
 				CURRENT_TIMESTAMP,
 				CURRENT_TIMESTAMP,
-				datetime(CURRENT_TIMESTAMP, '+24 hours')
+				datetime(CURRENT_TIMESTAMP, '+12 hours')
 			)
 			ON CONFLICT (id) DO UPDATE
 			SET
