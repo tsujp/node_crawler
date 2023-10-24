@@ -357,7 +357,7 @@ func (c *CrawlerV2) nodesToCrawlDaemon(batchSize int) {
 	defer c.wg.Done()
 
 	// To make sure we don't crawl the same node too often.
-	recentlyCrawled := fifomemory.New[enode.ID](batchSize * 4)
+	recentlyCrawled := fifomemory.New[enode.ID](batchSize * 2)
 
 	for {
 		nodes, err := c.db.SelectDiscoveredNodeSlice(batchSize)
