@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/crawler"
 	"github.com/ethereum/node-crawler/pkg/database"
+	"github.com/ethereum/node-crawler/pkg/fifomemory"
 	"github.com/ethereum/node-crawler/pkg/metrics"
 )
 
@@ -355,7 +356,8 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 func (c *CrawlerV2) nodesToCrawlDaemon(batchSize int) {
 	defer c.wg.Done()
 
-	lastNodes := make(map[string]struct{}, batchSize)
+	// To make sure we don't crawl the same node too often.
+	recentlyCrawled := fifomemory.New[enode.ID](batchSize * 4)
 
 	for {
 		nodes, err := c.db.SelectDiscoveredNodeSlice(batchSize)
@@ -373,19 +375,14 @@ func (c *CrawlerV2) nodesToCrawlDaemon(batchSize int) {
 			continue
 		}
 
-		currentNodes := make(map[string]struct{}, len(nodes))
-
 		for _, node := range nodes {
-			nodeID := node.ID().String()
+			nodeID := node.ID()
 
-			_, found := lastNodes[nodeID]
-			if !found {
-				currentNodes[nodeID] = struct{}{}
+			if !recentlyCrawled.Contains(nodeID) {
+				recentlyCrawled.Push(nodeID)
 				c.toCrawl <- node
 			}
 		}
-
-		lastNodes = currentNodes
 	}
 }
 
