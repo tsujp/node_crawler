@@ -307,7 +307,7 @@
                     ++ optional (cfg.crawler.network == "holesky") "--holesky"
                     ++ optional (cfg.crawler.network == "sepolia") "--sepolia";
                   in
-                  "${pkgs.nodeCrawler}/bin/crawler --pprof=${cfg.crawler.pprof} crawl ${concatStringsSep " " args}";
+                  "${pkgs.nodeCrawler}/bin/crawler --pprof=${toString cfg.crawler.pprof} crawl ${concatStringsSep " " args}";
 
                   WorkingDirectory = cfg.stateDir;
                   StateDirectory = optional (cfg.stateDir == /var/lib/node_crawler) "node_crawler";
@@ -335,7 +335,7 @@
                       "--metrics-addr=${cfg.api.metricsAddress}"
                     ];
                   in
-                  "${pkgs.nodeCrawler}/bin/crawler --pprof=${cfg.crawler.pprof} api ${concatStringsSep " " args}";
+                  "${pkgs.nodeCrawler}/bin/crawler --pprof=${toString cfg.api.pprof} api ${concatStringsSep " " args}";
 
                   WorkingDirectory = cfg.stateDir;
                   StateDirectory = optional (cfg.stateDir == /var/lib/node_crawler) "node_crawler";
