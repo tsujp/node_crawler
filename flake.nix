@@ -261,7 +261,7 @@
 
               nextCrawlNotEth = mkOption {
                 type = types.str;
-                default = "14d";
+                default = "336h"; # 14d
                 description = "Next crawl value if the node was not an eth node.";
               };
             };
