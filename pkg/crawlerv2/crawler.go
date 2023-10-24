@@ -318,6 +318,10 @@ func translateError(err error) (bool, string) {
 		return true, "network is unreachable"
 	case strings.Contains(errStr, "invalid message"):
 		return true, "invalid message"
+	case strings.Contains(errStr, "invalid public key"):
+		return true, "invalid public key"
+	case strings.Contains(errStr, "corrupt input"):
+		return true, "corrupt input"
 	default:
 		return false, errStr
 	}
