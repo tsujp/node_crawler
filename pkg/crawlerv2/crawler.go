@@ -369,7 +369,6 @@ func (c *CrawlerV2) nodesToCrawlDaemon(batchSize int) {
 		}
 
 		if len(nodes) == 0 {
-			log.Info("Nothing to crawl")
 			time.Sleep(time.Minute)
 
 			continue
