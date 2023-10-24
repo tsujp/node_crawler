@@ -51,11 +51,7 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 	return nil
 }
 
-func (d *DB) SelectDiscoveredNodeSlice(
-	nIDStart string,
-	nIDEnd string,
-	limit int,
-) ([]*enode.Node, error) {
+func (d *DB) SelectDiscoveredNodeSlice(limit int) ([]*enode.Node, error) {
 	var err error
 
 	start := time.Now()
@@ -67,14 +63,10 @@ func (d *DB) SelectDiscoveredNodeSlice(
 				node
 			FROM discovered_nodes
 			WHERE
-				id >= ?
-				AND id <= ?
-				AND next_crawl < CURRENT_TIMESTAMP
+				next_crawl < CURRENT_TIMESTAMP
 			ORDER BY next_crawl ASC
 			LIMIT ?
 		`,
-		nIDStart,
-		nIDEnd,
 		limit,
 	)
 	if err != nil {

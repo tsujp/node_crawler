@@ -40,8 +40,9 @@ type CrawlerV2 struct {
 	db         *database.DB
 	nodeKey    *ecdsa.PrivateKey
 	listenAddr string
-	workers    uint64
+	workers    int
 
+	toCrawl         chan *enode.Node
 	ch              chan common.NodeJSON
 	wg              *sync.WaitGroup
 	listener        net.Listener
@@ -56,7 +57,7 @@ func NewCrawlerV2(
 	genesis *core.Genesis,
 	networkID uint64,
 	listenAddr string,
-	workers uint64,
+	workers int,
 ) (*CrawlerV2, error) {
 	c := &CrawlerV2{
 		db:         db,
@@ -65,14 +66,9 @@ func NewCrawlerV2(
 		workers:    workers,
 	}
 
-	switch workers {
-	case 1, 2, 4, 8, 16, 32:
-	default:
-		return nil, fmt.Errorf("num crawlers: %d not in 1,2,4,8,16,32", workers)
-	}
-
 	c.wg = new(sync.WaitGroup)
 	c.ch = make(chan common.NodeJSON, 64)
+	c.toCrawl = make(chan *enode.Node)
 
 	td := big.NewInt(0)
 	// Merge total difficulty
@@ -271,10 +267,13 @@ func (c *CrawlerV2) startListener() error {
 }
 
 func (c *CrawlerV2) StartDaemon() error {
-	for _, v := range rangeN(c.workers) {
+	for i := 0; i < c.workers; i++ {
 		c.wg.Add(1)
-		go c.sliceCrawler(v.start, v.end)
+		go c.crawler()
 	}
+
+	c.wg.Add(1)
+	go c.nodesToCrawlDaemon(1000)
 
 	err := c.startListener()
 	if err != nil {
@@ -346,13 +345,16 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 	c.getClientInfo(conn, node, "dial")
 }
 
-func (c *CrawlerV2) sliceCrawler(nIDStart string, nIDEnd string) {
+// Meant to be run as a goroutine
+//
+// Selects nodes to crawl from the database
+func (c *CrawlerV2) nodesToCrawlDaemon(batchSize int) {
 	defer c.wg.Done()
 
-	log.Info("start crawler", "start", nIDStart, "end", nIDEnd)
+	lastNodes := make(map[string]struct{}, batchSize)
 
 	for {
-		nodes, err := c.db.SelectDiscoveredNodeSlice(nIDStart, nIDEnd, 100)
+		nodes, err := c.db.SelectDiscoveredNodeSlice(batchSize)
 		if err != nil {
 			log.Error("selecting discovered node slice failed", "err", err)
 			time.Sleep(time.Minute)
@@ -361,17 +363,35 @@ func (c *CrawlerV2) sliceCrawler(nIDStart string, nIDEnd string) {
 		}
 
 		if len(nodes) == 0 {
-			log.Info("no nodes to crawl", "start", nIDStart, "end", nIDEnd)
+			log.Info("Nothing to crawl")
 			time.Sleep(time.Minute)
 
 			continue
 		}
 
+		currentNodes := make(map[string]struct{}, len(nodes))
+
 		for _, node := range nodes {
-			c.crawlNode(node)
+			nodeID := node.ID().String()
+
+			_, found := lastNodes[nodeID]
+			if !found {
+				currentNodes[nodeID] = struct{}{}
+				c.toCrawl <- node
+			}
 		}
 
-		// Wait for database updater to catch up a bit
-		time.Sleep(10 * time.Second)
+		lastNodes = currentNodes
+	}
+}
+
+// Meant to be run as a goroutine
+//
+// Crawls nodes from the toCrawl channel
+func (c *CrawlerV2) crawler() {
+	defer c.wg.Done()
+
+	for node := range c.toCrawl {
+		c.crawlNode(node)
 	}
 }

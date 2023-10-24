@@ -77,7 +77,7 @@ var (
 		Usage: "Timeout for the crawling in a round",
 		Value: 5 * time.Minute,
 	}
-	workersFlag = cli.Uint64Flag{
+	workersFlag = cli.IntFlag{
 		Name:  "workers",
 		Usage: "Number of workers to start for updating nodes",
 		Value: 16,
