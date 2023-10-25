@@ -209,6 +209,7 @@ func (c *CrawlerV2) getClientInfo(
 			readError = msg
 			loop = false
 		case *crawler.NewPooledTransactionHashes:
+		case *crawler.NewPooledTransactionHashes66:
 			// NOOP
 		default:
 			log.Info("message type not handled", "type", reflect.TypeOf(msg).String())
