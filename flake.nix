@@ -286,7 +286,7 @@
             };
 
             systemd.services = {
-              node-crawler-crawler = {
+              node-crawler-crawler = mkIf cfg.crawler.enable {
                 description = "Node Cralwer, the Ethereum Node Crawler.";
                 wantedBy = [ "multi-user.target" ];
                 after = [ "network.target" ];
@@ -319,7 +319,7 @@
                   Restart = "on-failure";
                 };
               };
-              node-crawler-api = {
+              node-crawler-api = mkIf cfg.api.enable {
                 description = "Node Cralwer API, the API for the Ethereum Node Crawler.";
                 wantedBy = [ "multi-user.target" ];
                 after = [ "network.target" ]
