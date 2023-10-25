@@ -53,13 +53,16 @@ var (
 			"error",
 		},
 	)
-	TableStats = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "table_stats",
-		Help:      "Number of records per table",
-	}, []string{
-		"table",
-	})
+	DatabaseStats = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "database_stats",
+			Help:      "Stats from the database",
+		},
+		[]string{
+			"stat_name",
+		},
+	)
 )
 
 func boolToStatus(b bool) string {

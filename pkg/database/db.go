@@ -109,7 +109,15 @@ func (d *DB) CreateTables() error {
 	return nil
 }
 
-func (db *DB) getTableStats() (int, int, int, int, error) {
+type tableStats struct {
+	totalDiscoveredNodes int
+	totalCrawledNodes    int
+	totalBlocks          int
+	totalToCrawl         int
+	databaseSizeBytes    int
+}
+
+func (db *DB) getTableStats() (*tableStats, error) {
 	var err error
 
 	start := time.Now()
@@ -120,25 +128,35 @@ func (db *DB) getTableStats() (int, int, int, int, error) {
 			(SELECT COUNT(*) FROM discovered_nodes),
 			(SELECT COUNT(*) FROM discovered_nodes WHERE next_crawl < CURRENT_TIMESTAMP),
 			(SELECT COUNT(*) FROM crawled_nodes),
-			(SELECT COUNT(*) FROM blocks)
+			(SELECT COUNT(*) FROM blocks),
+			(
+				SELECT page_count * page_size
+				FROM pragma_page_count(), pragma_page_size()
+			)
 	`)
 	if err != nil {
-		return -1, -1, -1, -1, fmt.Errorf("query failed: %w", err)
+		return nil, fmt.Errorf("query failed: %w", err)
 	}
 	defer rows.Close()
 
-	var totalDisc, toCrawl, totalCrawled, totalBlocks int
-
 	for rows.Next() {
-		err = rows.Scan(&totalDisc, &toCrawl, &totalCrawled, &totalBlocks)
+		stats := tableStats{}
+
+		err = rows.Scan(
+			&stats.totalDiscoveredNodes,
+			&stats.totalToCrawl,
+			&stats.totalCrawledNodes,
+			&stats.totalBlocks,
+			&stats.databaseSizeBytes,
+		)
 		if err != nil {
-			return -1, -1, -1, -1, fmt.Errorf("scan failed: %w", err)
+			return nil, fmt.Errorf("scan failed: %w", err)
 		}
 
-		return totalDisc, toCrawl, totalCrawled, totalBlocks, nil
+		return &stats, nil
 	}
 
-	return -1, -1, -1, -1, sql.ErrNoRows
+	return nil, sql.ErrNoRows
 }
 
 // Meant to be run as a goroutine
@@ -148,17 +166,18 @@ func (db *DB) TableStatsMetricsDaemon(frequency time.Duration) {
 	for {
 		next := time.Now().Add(frequency)
 
-		totalDisc, toCrawl, totalCrawled, totalBlocks, err := db.getTableStats()
+		stats, err := db.getTableStats()
 		if err != nil {
 			log.Error("get table stats failed", "err", err)
 
 			continue
 		}
 
-		metrics.TableStats.WithLabelValues("crawled_nodes").Set(float64(totalCrawled))
-		metrics.TableStats.WithLabelValues("discovered_nodes").Set(float64(totalDisc))
-		metrics.TableStats.WithLabelValues("to_crawl").Set(float64(toCrawl))
-		metrics.TableStats.WithLabelValues("blocks").Set(float64(totalBlocks))
+		metrics.DatabaseStats.WithLabelValues("crawled_nodes").Set(float64(stats.totalCrawledNodes))
+		metrics.DatabaseStats.WithLabelValues("discovered_nodes").Set(float64(stats.totalDiscoveredNodes))
+		metrics.DatabaseStats.WithLabelValues("to_crawl").Set(float64(stats.totalToCrawl))
+		metrics.DatabaseStats.WithLabelValues("blocks").Set(float64(stats.totalBlocks))
+		metrics.DatabaseStats.WithLabelValues("database_bytes").Set(float64(stats.databaseSizeBytes))
 
 		time.Sleep(time.Until(next))
 	}
