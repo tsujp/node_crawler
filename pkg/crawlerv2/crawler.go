@@ -187,7 +187,7 @@ func (c *CrawlerV2) getClientInfo(
 				RequestId: 69420, // Just a random number
 				GetBlockHeadersPacket: &eth.GetBlockHeadersPacket{
 					Origin:  eth.HashOrNumber{Hash: msg.Head},
-					Amount:  100,
+					Amount:  10,
 					Skip:    0,
 					Reverse: true,
 				},
