@@ -18,7 +18,6 @@ package crawler
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
@@ -241,7 +240,6 @@ func (c *Conn) Read() Message {
 
 	if msg != nil {
 		if err := rlp.DecodeBytes(rawData, msg); err != nil {
-			fmt.Println(hex.EncodeToString(rawData))
 			return errorf("could not rlp decode message: %v", err)
 		}
 		return msg

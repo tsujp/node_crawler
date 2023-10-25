@@ -30,10 +30,6 @@ var (
 	clientName       = version.ClientName("NodeCrawler")
 )
 
-func init() {
-	fmt.Println(clientName)
-}
-
 func GetClientInfo(pk *ecdsa.PrivateKey, genesis *core.Genesis, networkID uint64, nodeURL string, n *enode.Node) (*common.ClientInfo, error) {
 	var info common.ClientInfo
 
