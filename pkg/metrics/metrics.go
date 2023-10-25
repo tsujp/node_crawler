@@ -55,8 +55,7 @@ var (
 	)
 	TableStats = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: namespace,
-		Subsystem: "table_stats",
-		Name:      "table_stats_total",
+		Name:      "table_stats",
 		Help:      "Number of records per table",
 	}, []string{
 		"table",
