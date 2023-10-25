@@ -53,23 +53,13 @@ var (
 			"error",
 		},
 	)
-	TableStatsDiscNodes = promauto.NewGauge(prometheus.GaugeOpts{
+	TableStats = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Subsystem: "table_stats",
-		Name:      "disc_nodes",
-		Help:      "Number of discovered nodes",
-	})
-	TableStatsNodesToCrawl = promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Subsystem: "table_stats",
-		Name:      "nodes_to_crawl",
-		Help:      "Number of nodes where the next crawl time is in the past",
-	})
-	TableStatsCrawledNodeCount = promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Subsystem: "table_stats",
-		Name:      "crawled_nodes",
-		Help:      "Number of crawled nodes",
+		Name:      "table_stats_total",
+		Help:      "Number of records per table",
+	}, []string{
+		"table",
 	})
 )
 

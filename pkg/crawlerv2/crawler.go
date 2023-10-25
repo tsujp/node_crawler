@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -144,6 +145,8 @@ func (c *CrawlerV2) getClientInfo(
 		Direction: direction,
 	}
 
+	gotStatus := false
+
 	loop := true
 	for loop {
 		switch msg := conn.Read().(type) {
@@ -173,9 +176,27 @@ func (c *CrawlerV2) getClientInfo(
 
 			_ = conn.Write(c.status)
 		case *crawler.Status:
+			gotStatus = true
+
 			nodeJSON.Info.ForkID = msg.ForkID
 			nodeJSON.Info.HeadHash = msg.Head
 			nodeJSON.Info.NetworkID = msg.NetworkID
+
+			_ = conn.Write(crawler.GetBlockHeaders{
+				RequestId: 69420, // Just a random number
+				GetBlockHeadersPacket: &eth.GetBlockHeadersPacket{
+					Origin:  eth.HashOrNumber{Hash: msg.Head},
+					Amount:  100,
+					Skip:    0,
+					Reverse: true,
+				},
+			})
+		case *crawler.GetBlockHeaders:
+			_ = conn.Write(crawler.BlockHeaders{
+				RequestId: msg.RequestId,
+			})
+		case *crawler.BlockHeaders:
+			nodeJSON.BlockHeaders = msg.BlockHeadersPacket
 
 			_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscQuitting})
 
@@ -191,11 +212,15 @@ func (c *CrawlerV2) getClientInfo(
 		}
 	}
 
-	if !nodeJSON.EthNode {
+	_ = conn.Close()
+
+	if !nodeJSON.EthNode || gotStatus {
 		c.ch <- nodeJSON
 
 		return
-	} else if disconnect != nil {
+	}
+
+	if disconnect != nil {
 		nodeJSON.Error = disconnect.Reason.String()
 	} else if readError != nil {
 		known, errStr := translateError(readError)
@@ -368,12 +393,6 @@ func (c *CrawlerV2) nodesToCrawlDaemon(batchSize int) {
 			continue
 		}
 
-		if len(nodes) == 0 {
-			time.Sleep(time.Minute)
-
-			continue
-		}
-
 		for _, node := range nodes {
 			nodeID := node.ID()
 
@@ -383,7 +402,9 @@ func (c *CrawlerV2) nodesToCrawlDaemon(batchSize int) {
 			}
 		}
 
-		time.Sleep(10 * time.Second)
+		if len(nodes) < batchSize {
+			time.Sleep(time.Minute)
+		}
 	}
 }
 

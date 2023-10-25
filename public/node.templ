@@ -50,8 +50,8 @@ templ NodeTable(nt database.NodeTable) {
 					<td>{ nt.NextForkID }</td>
 				</tr>
 				<tr>
-					<td>Block Height</td>
-					<td>{ nt.BlockHeight }</td>
+					<td>Head Hash</td>
+					<td>{ nt.HeadHashLine() }</td>
 				</tr>
 				<tr>
 					<td>Sequence</td>
@@ -76,6 +76,10 @@ templ NodeTable(nt database.NodeTable) {
 				<tr>
 					<td>Next Crawl (Scheduled)</td>
 					<td>{ nt.NextCrawl() }</td>
+				</tr>
+				<tr>
+					<td>Is Synced</td>
+					<td>{ nt.IsSynced() }</td>
 				</tr>
 			</tbody>
 		</table>
@@ -141,11 +145,43 @@ templ NodeList(nodes database.NodeList) {
 							templ.KV(pageButtonActive(), networkID == nodes.NetworkFilter),
 							templ.KV(pageButtonInactive(), networkID != nodes.NetworkFilter),
 						 }
- 						href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", networkID, nodes.PageNumber)) }
+ 						href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&synced=%d", networkID, nodes.PageNumber, nodes.Synced)) }
 					>
 						{ nodes.NetworkName(networkID) }
 					</a>
 				}
+			</div>
+			<div style="display: flex; flex-direction: row; gap: 0.5em;">
+					<a
+						class={ 
+							pageButton(),
+							templ.KV(pageButtonActive(), nodes.Synced == -1),
+							templ.KV(pageButtonInactive(), nodes.Synced != -1),
+						 }
+ 						href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&synced=-1", nodes.NetworkFilter, nodes.PageNumber)) }
+					>
+						All
+					</a>
+					<a
+						class={ 
+							pageButton(),
+							templ.KV(pageButtonActive(), nodes.Synced == 1),
+							templ.KV(pageButtonInactive(), nodes.Synced != 1),
+						 }
+ 						href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&synced=1", nodes.NetworkFilter, nodes.PageNumber)) }
+					>
+						Synced
+					</a>
+					<a
+						class={ 
+							pageButton(),
+							templ.KV(pageButtonActive(), nodes.Synced == 0),
+							templ.KV(pageButtonInactive(), nodes.Synced != 0),
+						 }
+ 						href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&synced=0", nodes.NetworkFilter, nodes.PageNumber)) }
+					>
+						Not Synced
+					</a>
 			</div>
 			<table style="width:100%">
 				<thead>
@@ -154,6 +190,7 @@ templ NodeList(nodes database.NodeList) {
 						<td>Client Name</td>
 						<td>Last Update</td>
 						<td>Country</td>
+						<td>Is Synced</td>
 					</tr>
 				</thead>
 				<tbody>
@@ -163,6 +200,7 @@ templ NodeList(nodes database.NodeList) {
 							<td>{ row.ClientName }</td>
 							<td title={ row.UpdatedAt }>{ row.SinceUpdate() }</td>
 							<td>{ row.Country }</td>
+							<td>{ row.IsSynced() }</td>
 						</tr>
 					}
 				</tbody>
@@ -178,15 +216,15 @@ templ NodeList(nodes database.NodeList) {
 				</span>
 				<div style="display:flex;flex-direction:row;align-items:center">
 					if nodes.PageNumber > 6 {
-						@pageNumberButton(nodes.NetworkFilter, 1, false)
+						@pageNumberButton(nodes.NetworkFilter, 1, false, nodes.Synced)
 						@spacer()
 					}
 					for i := startPage(nodes); i <= endPage(nodes); i++ {
-						@pageNumberButton(nodes.NetworkFilter, i, i == nodes.PageNumber)
+						@pageNumberButton(nodes.NetworkFilter, i, i == nodes.PageNumber, nodes.Synced)
 					}
 					if nodes.PageNumber < nodes.NPages() - 4 {
 						@spacer()
-						@pageNumberButton(nodes.NetworkFilter, nodes.NPages(), false)
+						@pageNumberButton(nodes.NetworkFilter, nodes.NPages(), false, nodes.Synced)
 					}
 				</div>
 			</div>
@@ -224,9 +262,9 @@ templ spacer() {
 	</div>
 }
 
-templ pageNumberButton(networkID int, pageNumber int, isPage bool) {
+templ pageNumberButton(networkID int, pageNumber int, isPage bool, synced int) {
 	<a
- 		href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", networkID, pageNumber)) }
+ 		href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&synced=%d", networkID, pageNumber, synced)) }
  		class={ 
 			pageButton(),
 			templ.KV(pageButtonActive(), isPage),

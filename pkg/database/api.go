@@ -17,25 +17,26 @@ type NodeTableHistory struct {
 }
 
 type NodeTable struct {
-	ID             string
-	updatedAt      string
-	Enode          string
-	ClientName     string
-	RlpxVersion    string
-	Capabilities   string
-	NetworkID      int
-	ForkID         string
-	NextForkID     string
-	BlockHeight    string
-	HeadHash       string
-	IP             string
-	ConnectionType string
-	Country        string
-	City           string
-	Latitude       float64
-	Longitude      float64
-	Sequence       string
-	nextCrawl      string
+	ID                string
+	updatedAt         string
+	Enode             string
+	ClientName        string
+	RlpxVersion       string
+	Capabilities      string
+	NetworkID         int
+	ForkID            string
+	NextForkID        string
+	BlockHeight       string
+	HeadHash          string
+	HeadHashTimestamp string
+	IP                string
+	ConnectionType    string
+	Country           string
+	City              string
+	Latitude          float64
+	Longitude         float64
+	Sequence          string
+	nextCrawl         string
 
 	History []NodeTableHistory
 }
@@ -46,6 +47,38 @@ func (n NodeTable) YOffsetPercent() int {
 
 func (n NodeTable) XOffsetPercent() int {
 	return int((n.Longitude + 180) / 360 * 100)
+}
+
+func (n NodeTable) HeadHashLine() string {
+	if n.HeadHashTimestamp == "" {
+		return n.HeadHash
+	}
+
+	return fmt.Sprintf("%s (%s)", n.HeadHash, n.HeadHashTimestamp)
+}
+
+func isSynced(ts1 string, ts2 string) string {
+	t1, err := time.ParseInLocation(time.DateTime, ts1, time.UTC)
+	if err != nil {
+		return "Unknown"
+	}
+
+	t2, err := time.ParseInLocation(time.DateTime, ts2, time.UTC)
+	if err != nil {
+		return "Unknown"
+	}
+
+	// If head hash is within one minute of the crawl time,
+	// we can consider the node in sync
+	if t1.Sub(t2).Abs() < time.Minute {
+		return "Yes"
+	}
+
+	return "No"
+}
+
+func (n NodeTable) IsSynced() string {
+	return isSynced(n.updatedAt, n.HeadHashTimestamp)
 }
 
 func sinceUpdate(updatedAt string) string {
@@ -114,11 +147,12 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				coalesce(client_name, ''),
 				coalesce(CAST(rlpx_version AS TEXT), ''),
 				coalesce(capabilities, ''),
-				coalesce(network_id, -1),
+				coalesce(crawled.network_id, -1),
 				coalesce(fork_id, ''),
 				coalesce(CAST(next_fork_id AS TEXT), ''),
 				coalesce(block_height, ''),
 				coalesce(head_hash, ''),
+				coalesce(blocks.timestamp, ''),
 				coalesce(disc.ip_address, ''),
 				coalesce(connection_type, ''),
 				coalesce(country, ''),
@@ -129,6 +163,10 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				coalesce(next_crawl, '')
 			FROM discovered_nodes AS disc
 			LEFT JOIN crawled_nodes AS crawled ON (disc.id = crawled.id)
+			LEFT JOIN blocks ON (
+				crawled.head_hash = blocks.block_hash
+				AND crawled.network_id = blocks.network_id
+			)
 			WHERE disc.id = ?;
 		`,
 		nodeID,
@@ -148,6 +186,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		&nodePage.NextForkID,
 		&nodePage.BlockHeight,
 		&nodePage.HeadHash,
+		&nodePage.HeadHashTimestamp,
 		&nodePage.IP,
 		&nodePage.ConnectionType,
 		&nodePage.Country,
@@ -204,19 +243,25 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 }
 
 type NodeListRow struct {
-	ID         string
-	UpdatedAt  string
-	ClientName string
-	Country    string
+	ID                string
+	UpdatedAt         string
+	ClientName        string
+	Country           string
+	HeadHashTimestamp string
 }
 
 func (n NodeListRow) SinceUpdate() string {
 	return sinceUpdate(n.UpdatedAt)
 }
 
+func (n NodeListRow) IsSynced() string {
+	return isSynced(n.UpdatedAt, n.HeadHashTimestamp)
+}
+
 type NodeList struct {
 	PageNumber    int
 	PageSize      int
+	Synced        int
 	Offset        int
 	Total         int
 	NetworkFilter int
@@ -233,7 +278,7 @@ func (l NodeList) NPages() int {
 	return int(math.Ceil(float64(l.Total) / float64(l.PageSize)))
 }
 
-func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int) (*NodeList, error) {
+func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int, synced int) (*NodeList, error) {
 	var err error
 
 	start := time.Now()
@@ -250,18 +295,38 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int) (*
 				updated_at,
 				coalesce(client_name, ''),
 				coalesce(country, ''),
+				coalesce(blocks.timestamp, ''),
 				COUNT(*) OVER () AS total
-			FROM crawled_nodes
+			FROM crawled_nodes AS crawled
+			LEFT JOIN blocks ON (
+				crawled.head_hash = blocks.block_hash
+				AND crawled.network_id = blocks.network_id
+			)
 			WHERE
 				(
-					network_id = ?1
-					OR -1 = ?1
+					crawled.network_id = ?1
+					OR ?1 = -1
+				)
+				AND (
+					?2 = -1  -- All
+					OR (     -- Not synced
+						(
+							abs(unixepoch(crawled.updated_at) - unixepoch(blocks.timestamp)) >= 60
+							OR blocks.timestamp IS NULL
+						)
+						AND ?2 = 0
+					)
+					OR (     -- Synced
+						abs(unixepoch(crawled.updated_at) - unixepoch(blocks.timestamp)) < 60
+						AND ?2 = 1
+					)
 				)
 			ORDER BY id
-			LIMIT ?2
-			OFFSET ?3
+			LIMIT ?3
+			OFFSET ?4
 		`,
 		networkID,
+		synced,
 		pageSize,
 		offset,
 	)
@@ -273,6 +338,7 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int) (*
 	out := NodeList{
 		PageSize:      pageSize,
 		PageNumber:    pageNumber,
+		Synced:        synced,
 		Offset:        offset,
 		Total:         0,
 		List:          []NodeListRow{},
@@ -287,6 +353,7 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int) (*
 			&row.UpdatedAt,
 			&row.ClientName,
 			&row.Country,
+			&row.HeadHashTimestamp,
 			&out.Total,
 		)
 		if err != nil {

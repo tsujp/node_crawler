@@ -42,13 +42,13 @@ func NewDB(
 func (d *DB) CreateTables() error {
 	_, err := d.db.Exec(`
 		CREATE TABLE IF NOT EXISTS discovered_nodes (
-			id			TEXT		PRIMARY KEY,
-			node		TEXT		NOT NULL,
-			ip_address	TEXT		NOT NULL,
-			first_found	TIMESTAMPTZ	NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			last_found	TIMESTAMPTZ	NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			next_crawl	TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-		);
+			id			TEXT	PRIMARY KEY,
+			node		TEXT	NOT NULL,
+			ip_address	TEXT	NOT NULL,
+			first_found	TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_found	TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			next_crawl	TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP
+		) STRICT;
 
 		CREATE INDEX IF NOT EXISTS id_next_crawl
 			ON discovered_nodes (id, next_crawl);
@@ -56,24 +56,24 @@ func (d *DB) CreateTables() error {
 			ON discovered_nodes (next_crawl, node);
 
 		CREATE TABLE IF NOT EXISTS crawled_nodes (
-			id				TEXT		PRIMARY KEY,
-			updated_at		TIMESTAMPTZ	NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			client_name		TEXT		DEFAULT NULL,
-			rlpx_version	INTEGER		DEFAULT NULL,
-			capabilities	TEXT		DEFAULT NULL,
-			network_id		INTEGER		DEFAULT NULL,
-			fork_id			TEXT		DEFAULT NULL,
-			next_fork_id	INTEGER		DEFAULT NULL,
-			block_height	TEXT		DEFAULT NULL,
-			head_hash		TEXT		DEFAULT NULL,
-			ip				TEXT		DEFAULT NULL,
-			connection_type	TEXT		DEFAULT NULL,
-			country			TEXT		DEFAULT NULL,
-			city			TEXT		DEFAULT NULL,
-			latitude		REAL		DEFAULT NULL,
-			longitude		REAL		DEFAULT NULL,
-			sequence		INTEGER		DEFAULT NULL
-		);
+			id				TEXT	PRIMARY KEY,
+			updated_at		TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			client_name		TEXT	DEFAULT NULL,
+			rlpx_version	INTEGER	DEFAULT NULL,
+			capabilities	TEXT	DEFAULT NULL,
+			network_id		INTEGER	DEFAULT NULL,
+			fork_id			TEXT	DEFAULT NULL,
+			next_fork_id	INTEGER	DEFAULT NULL,
+			block_height	TEXT	DEFAULT NULL,
+			head_hash		TEXT	DEFAULT NULL,
+			ip				TEXT	DEFAULT NULL,
+			connection_type	TEXT	DEFAULT NULL,
+			country			TEXT	DEFAULT NULL,
+			city			TEXT	DEFAULT NULL,
+			latitude		REAL	DEFAULT NULL,
+			longitude		REAL	DEFAULT NULL,
+			sequence		INTEGER	DEFAULT NULL
+		) STRICT;
 
 		CREATE INDEX IF NOT EXISTS id_last_seen
 			ON crawled_nodes (id, updated_at);
@@ -81,13 +81,26 @@ func (d *DB) CreateTables() error {
 			ON crawled_nodes (network_id);
 
 		CREATE TABLE IF NOT EXISTS crawl_history (
-			id			TEXT		NOT NULL,
-			crawled_at	TIMESTAMPTZ	NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			direction	TEXT		NOT NULL,
-			error		TEXT		DEFAULT NULL,
+			id			TEXT	NOT NULL,
+			crawled_at	TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			direction	TEXT	NOT NULL,
+			error		TEXT	DEFAULT NULL,
 
 			PRIMARY KEY (id, crawled_at)
-		);
+		) STRICT;
+
+		CREATE TABLE IF NOT EXISTS blocks (
+			block_hash		TEXT	NOT NULL,
+			network_id		INTEGER NOT NULL,
+			timestamp		TEXT	NOT NULL,
+			block_number	INTEGER	NOT NULL,
+			parent_hash		TEXT	DEFAULT NULL,
+
+			PRIMARY KEY (block_hash, network_id)
+		) STRICT;
+
+		CREATE INDEX IF NOT EXISTS blocks_block_hash_timestamp
+			ON blocks (block_hash, timestamp);
 	`)
 	if err != nil {
 		return fmt.Errorf("creating table discovered_nodes failed: %w", err)
@@ -96,7 +109,7 @@ func (d *DB) CreateTables() error {
 	return nil
 }
 
-func (db *DB) getTableStats() (int, int, int, error) {
+func (db *DB) getTableStats() (int, int, int, int, error) {
 	var err error
 
 	start := time.Now()
@@ -106,25 +119,26 @@ func (db *DB) getTableStats() (int, int, int, error) {
 		SELECT
 			(SELECT COUNT(*) FROM discovered_nodes),
 			(SELECT COUNT(*) FROM discovered_nodes WHERE next_crawl < CURRENT_TIMESTAMP),
-			(SELECT COUNT(*) FROM crawled_nodes)
+			(SELECT COUNT(*) FROM crawled_nodes),
+			(SELECT COUNT(*) FROM blocks)
 	`)
 	if err != nil {
-		return -1, -1, -1, fmt.Errorf("query failed: %w", err)
+		return -1, -1, -1, -1, fmt.Errorf("query failed: %w", err)
 	}
 	defer rows.Close()
 
-	var totalDisc, toCrawl, totalCrawled int
+	var totalDisc, toCrawl, totalCrawled, totalBlocks int
 
 	for rows.Next() {
-		err = rows.Scan(&totalDisc, &toCrawl, &totalCrawled)
+		err = rows.Scan(&totalDisc, &toCrawl, &totalCrawled, &totalBlocks)
 		if err != nil {
-			return -1, -1, -1, fmt.Errorf("scan failed: %w", err)
+			return -1, -1, -1, -1, fmt.Errorf("scan failed: %w", err)
 		}
 
-		return totalDisc, toCrawl, totalCrawled, nil
+		return totalDisc, toCrawl, totalCrawled, totalBlocks, nil
 	}
 
-	return -1, -1, -1, sql.ErrNoRows
+	return -1, -1, -1, -1, sql.ErrNoRows
 }
 
 // Meant to be run as a goroutine
@@ -134,16 +148,17 @@ func (db *DB) TableStatsMetricsDaemon(frequency time.Duration) {
 	for {
 		next := time.Now().Add(frequency)
 
-		totalDisc, toCrawl, totalCrawled, err := db.getTableStats()
+		totalDisc, toCrawl, totalCrawled, totalBlocks, err := db.getTableStats()
 		if err != nil {
 			log.Error("get table stats failed", "err", err)
 
 			continue
 		}
 
-		metrics.TableStatsCrawledNodeCount.Set(float64(totalCrawled))
-		metrics.TableStatsDiscNodes.Set(float64(totalDisc))
-		metrics.TableStatsNodesToCrawl.Set(float64(toCrawl))
+		metrics.TableStats.WithLabelValues("crawled_nodes").Set(float64(totalCrawled))
+		metrics.TableStats.WithLabelValues("discovered_nodes").Set(float64(totalDisc))
+		metrics.TableStats.WithLabelValues("to_crawl").Set(float64(toCrawl))
+		metrics.TableStats.WithLabelValues("blocks").Set(float64(totalBlocks))
 
 		time.Sleep(time.Until(next))
 	}

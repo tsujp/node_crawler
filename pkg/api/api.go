@@ -111,6 +111,7 @@ func setQuery(url *url.URL, key, value string) *url.URL {
 func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	var pageNumber int
 	var networkID int
+	var synced int
 	var err error
 
 	redirectURL := r.URL
@@ -118,6 +119,7 @@ func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 
 	pageNumStr := r.URL.Query().Get("page")
 	networkIDStr := r.URL.Query().Get("network")
+	syncedStr := r.URL.Query().Get("synced")
 
 	if pageNumStr == "" {
 		redirectURL = setQuery(redirectURL, "page", "1")
@@ -135,6 +137,7 @@ func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 			redirect = true
 		}
 	}
+
 	if networkIDStr == "" {
 		redirectURL = setQuery(redirectURL, "network", "1")
 		redirect = true
@@ -148,6 +151,26 @@ func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if syncedStr == "" {
+		redirectURL = setQuery(redirectURL, "synced", "-1")
+		redirect = true
+	} else {
+		synced, err = strconv.Atoi(syncedStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad synced value: %s\n", networkIDStr)
+
+			return
+		}
+
+		if synced != -1 && synced != 0 && synced != 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad synced value: %s. Must be one of -1, 0, 1\n", syncedStr)
+
+			return
+		}
+	}
+
 	if redirect {
 		w.Header().Add("Location", redirectURL.String())
 		w.WriteHeader(http.StatusTemporaryRedirect)
@@ -155,7 +178,7 @@ func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := a.dbv2.GetNodeList(r.Context(), pageNumber, networkID)
+	nodes, err := a.dbv2.GetNodeList(r.Context(), pageNumber, networkID, synced)
 	if err != nil {
 		log.Error("get node list failed", "err", err, "pageNumber", pageNumber)
 		w.WriteHeader(http.StatusInternalServerError)

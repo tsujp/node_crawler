@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/metrics"
 )
@@ -257,6 +258,55 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)
+	}
+
+	if len(node.BlockHeaders) != 0 {
+		err = db.InsertBlocks(node.BlockHeaders, node.Info.NetworkID)
+		if err != nil {
+			return fmt.Errorf("inserting blocks failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (db *DB) InsertBlocks(blocks []*types.Header, networkID uint64) error {
+	stmt, err := db.db.Prepare(`
+		INSERT INTO blocks (
+			block_hash,
+			network_id,
+			timestamp,
+			block_number,
+			parent_hash
+		) VALUES (
+			?,
+			?,
+			?,
+			?,
+			?
+		)
+		ON CONFLICT (block_hash, network_id)
+		DO NOTHING
+	`)
+	if err != nil {
+		return fmt.Errorf("preparing statement failed: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, block := range blocks {
+		start := time.Now()
+		_, err = stmt.Exec(
+			block.Hash().String(),
+			networkID,
+			time.Unix(int64(block.Time), 0).UTC().Format(time.DateTime),
+			block.Number.Uint64(),
+			block.ParentHash.String(),
+		)
+		metrics.ObserveDBQuery("insert_block", time.Since(start), err)
+
+		if err != nil {
+			return fmt.Errorf("statement exec failed: %w", err)
+		}
 	}
 
 	return nil

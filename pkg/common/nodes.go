@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 )
@@ -51,9 +52,10 @@ type NodeJSON struct {
 
 	Info *ClientInfo `json:"clientInfo,omitempty"`
 
-	Error     string
-	EthNode   bool
-	Direction string
+	Error        string
+	EthNode      bool
+	Direction    string
+	BlockHeaders []*types.Header
 }
 
 func (n *NodeJSON) ID() string {
