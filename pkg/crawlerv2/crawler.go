@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -210,7 +211,7 @@ func (c *CrawlerV2) getClientInfo(
 		case *crawler.NewPooledTransactionHashes:
 			// NOOP
 		default:
-			log.Info("message type not handled", "msg", msg)
+			log.Info("message type not handled", "type", reflect.TypeOf(msg).String())
 		}
 	}
 
