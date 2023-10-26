@@ -34,7 +34,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	gethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -191,8 +190,6 @@ func crawlNodesV2(cCtx *cli.Context) error {
 	crawler, err := crawlerv2.NewCrawlerV2(
 		db,
 		nodeKey,
-		core.DefaultGenesisBlock(),
-		utils.NetworkIdFlag.Get(cCtx),
 		listenAddrFlag.Get(cCtx),
 		workersFlag.Get(cCtx),
 	)

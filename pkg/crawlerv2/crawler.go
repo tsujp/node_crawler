@@ -3,16 +3,12 @@ package crawlerv2
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"math/big"
 	"net"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/forkid"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -45,20 +41,15 @@ type CrawlerV2 struct {
 	listenAddr string
 	workers    int
 
-	toCrawl         chan *enode.Node
-	ch              chan common.NodeJSON
-	wg              *sync.WaitGroup
-	listener        net.Listener
-	status          *crawler.Status
-	totalDifficulty big.Int
-	genesisBlock    *types.Block
+	toCrawl  chan *enode.Node
+	ch       chan common.NodeJSON
+	wg       *sync.WaitGroup
+	listener net.Listener
 }
 
 func NewCrawlerV2(
 	db *database.DB,
 	nodeKey *ecdsa.PrivateKey,
-	genesis *core.Genesis,
-	networkID uint64,
 	listenAddr string,
 	workers int,
 ) (*CrawlerV2, error) {
@@ -72,22 +63,6 @@ func NewCrawlerV2(
 	c.wg = new(sync.WaitGroup)
 	c.ch = make(chan common.NodeJSON, 64)
 	c.toCrawl = make(chan *enode.Node)
-
-	td := big.NewInt(0)
-	// Merge total difficulty
-	td.SetString("58750003716598360000000", 10)
-
-	genesisBlock := genesis.ToBlock()
-	genesisHash := genesisBlock.Hash()
-
-	c.status = &crawler.Status{
-		ProtocolVersion: 66,
-		NetworkID:       networkID,
-		TD:              td,
-		Head:            genesisHash,
-		Genesis:         genesisHash,
-		ForkID:          forkid.NewID(genesis.Config, genesisBlock, 0, 0),
-	}
 
 	return c, nil
 }
