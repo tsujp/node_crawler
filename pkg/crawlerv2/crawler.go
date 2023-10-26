@@ -173,6 +173,10 @@ func (c *CrawlerV2) getClientInfo(
 					Reverse: true,
 				},
 			})
+		case *crawler.GetBlockBodies:
+			_ = conn.Write(crawler.BlockBodies{
+				RequestId: msg.RequestId,
+			})
 		case *crawler.GetBlockHeaders:
 			_ = conn.Write(crawler.BlockHeaders{
 				RequestId: msg.RequestId,
