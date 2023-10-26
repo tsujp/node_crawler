@@ -292,7 +292,7 @@ func (c *CrawlerV2) StartDaemon() error {
 	}
 
 	c.wg.Add(1)
-	go c.nodesToCrawlDaemon(100)
+	go c.nodesToCrawlDaemon(c.workers * 4)
 
 	err := c.startListener()
 	if err != nil {
