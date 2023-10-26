@@ -355,17 +355,9 @@
               virtualHosts."${cfg.hostName}" = mkMerge [
                 cfg.nginx
                 {
-                  root = mkForce "${pkgs.nodeCrawlerFrontend}/share/frontend";
                   locations = {
                     "/" = {
-                      index = "index.html";
-                      tryFiles = "$uri $uri/ /index.html";
-                    };
-                    "/v1/" = {
-                      proxyPass = "http://nodeCrawlerApi/v1/";
-                    };
-                    "/nodes" = {
-                      proxyPass = "http://nodeCrawlerApi/nodes";
+                      proxyPass = "http://nodeCrawlerApi/";
                     };
                   };
                 }
