@@ -191,10 +191,96 @@ func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	_ = index.Render(r.Context(), w)
 }
 
+func (a *Api) handleRoot(w http.ResponseWriter, r *http.Request) {
+	var networkID int
+	var synced int
+	var err error
+
+	redirectURL := r.URL
+	redirect := false
+
+	networkIDStr := r.URL.Query().Get("network")
+	syncedStr := r.URL.Query().Get("synced")
+
+	if networkIDStr == "" {
+		redirectURL = setQuery(redirectURL, "network", "1")
+		redirect = true
+	} else {
+		networkID, err = strconv.Atoi(networkIDStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
+
+			return
+		}
+	}
+
+	if syncedStr == "" {
+		redirectURL = setQuery(redirectURL, "synced", "-1")
+		redirect = true
+	} else {
+		synced, err = strconv.Atoi(syncedStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad synced value: %s\n", networkIDStr)
+
+			return
+		}
+
+		if synced != -1 && synced != 0 && synced != 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad synced value: %s. Must be one of -1, 0, 1\n", syncedStr)
+
+			return
+		}
+	}
+
+	if redirect {
+		w.Header().Add("Location", redirectURL.String())
+		w.WriteHeader(http.StatusTemporaryRedirect)
+
+		return
+	}
+
+	stats, err := a.dbv2.GetStats(r.Context())
+	if err != nil {
+		log.Error("get stats failed", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	clientNames := stats.CountClientName(
+		func(s database.Stats) bool {
+			return s.NetworkID == networkID
+		},
+		func(s database.Stats) bool {
+			return synced == -1 ||
+				(synced == 1 && s.Synced == "Yes") ||
+				(synced == 0 && s.Synced == "No")
+		},
+	)
+
+	maxValue := 0
+	for _, client := range clientNames {
+		maxValue = max(maxValue, client.Count)
+	}
+
+	sb := new(strings.Builder)
+
+	statsPage := public.Stats(clientNames, maxValue, networkID, synced)
+	index := public.Index(statsPage)
+	_ = index.Render(r.Context(), sb)
+
+	out := strings.ReplaceAll(sb.String(), "STYLE_REPLACE", "style")
+
+	_, err = w.Write([]byte(out))
+}
+
 func (a *Api) HandleRequests(wg *sync.WaitGroup) {
 	defer wg.Done()
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("Hello")) })
+	router.HandleFunc("/", a.handleRoot)
 	router.HandleFunc("/v1/dashboard", a.handleDashboard).Queries("filter", "{filter}")
 	router.HandleFunc("/v1/dashboard", a.handleDashboard)
 	router.HandleFunc("/nodes", a.nodesListHandler)

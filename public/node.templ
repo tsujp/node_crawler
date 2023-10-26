@@ -289,11 +289,78 @@ css pageButtonInactive() {
 	border: 2px solid #eee;
 }
 
+templ Stats(clients []database.Count, maxValue int, networkID int, synced int) {
+	<div style="display: flex; flex-direction: column; padding: 1em; gap: 1em;">
+		<div style="display: flex; flex-direction: row; gap: 0.5em;">
+			<a
+				class={ 
+					pageButton(),
+					templ.KV(pageButtonActive(), -1 == networkID),
+					templ.KV(pageButtonInactive(), -1 != networkID),
+				 }
+				href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", -1, synced)) }
+			>
+				All (-1)
+			</a>
+			for _, netID := range []int{1, 5, 17000, 11155111} {
+				<a
+					class={ 
+						pageButton(),
+						templ.KV(pageButtonActive(), netID == networkID),
+						templ.KV(pageButtonInactive(), netID != networkID),
+					 }
+					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", netID, synced)) }
+				>
+					{ database.NetworkName(netID) } ({ strconv.Itoa(netID) })
+				</a>
+			}
+		</div>
+		<div style="display: flex; flex-direction: row; gap: 0.5em;">
+				<a
+					class={ 
+						pageButton(),
+						templ.KV(pageButtonActive(), synced == -1),
+						templ.KV(pageButtonInactive(), synced != -1),
+					 }
+					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=-1", networkID)) }
+				>
+					All
+				</a>
+				<a
+					class={ 
+						pageButton(),
+						templ.KV(pageButtonActive(), synced == 1),
+						templ.KV(pageButtonInactive(), synced != 1),
+					 }
+					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=1", networkID)) }
+				>
+					Synced
+				</a>
+				<a
+					class={ 
+						pageButton(),
+						templ.KV(pageButtonActive(), synced == 0),
+						templ.KV(pageButtonInactive(), synced != 0),
+					 }
+					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=0", networkID)) }
+				>
+					Not Synced
+				</a>
+		</div>
+		<div style="display: flex; flex-direction: column;">
+				for i := len(clients)-1; i >= 0; i-- {
+					<div STYLE_REPLACE={fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", clients[i].Count * 100 / maxValue)}>
+							<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ clients[i].Key } ({ strconv.Itoa(clients[i].Count) })</span>
+					</div>
+				}
+		</div>
+	</div>
+}
+
 templ Index(main templ.Component) {
 	<!DOCTYPE html>
 	<html lang="en-US">
 		<head>
-			<script src="https://unpkg.com/htmx.org@1.9.6"></script>
 			<title>Node Crawler</title>
 			<style type="text/css">
 				body {
@@ -346,8 +413,8 @@ templ Index(main templ.Component) {
 		<body>
 			<nav>
 				<ul>
-					<li><a href="/">Home</a></li>
-					<li><a href="/nodes?page=1">Nodes</a></li>
+					<li><a href="/">Stats</a></li>
+					<li><a href="/nodes?network=1&page=1&synced=-1">Nodes</a></li>
 				</ul>
 			</nav>
 			<main>

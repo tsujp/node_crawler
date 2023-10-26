@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/node-crawler/pkg/metrics"
+	"golang.org/x/exp/slices"
 )
 
 type NodeTableHistory struct {
@@ -112,7 +115,7 @@ func (n NodeTable) NextCrawl() string {
 	return fmt.Sprintf("%s (%s)", sinceUpdate(n.nextCrawl), n.nextCrawl)
 }
 
-func networkName(networkID int) string {
+func NetworkName(networkID int) string {
 	switch networkID {
 	case int(params.MainnetChainConfig.ChainID.Int64()):
 		return "Mainnet"
@@ -128,7 +131,7 @@ func networkName(networkID int) string {
 }
 
 func (n NodeTable) NetworkName() string {
-	return networkName(n.NetworkID)
+	return NetworkName(n.NetworkID)
 }
 
 func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, error) {
@@ -271,7 +274,7 @@ type NodeList struct {
 }
 
 func (_ NodeList) NetworkName(networkID int) string {
-	return fmt.Sprintf("%s (%d)", networkName(networkID), networkID)
+	return fmt.Sprintf("%s (%d)", NetworkName(networkID), networkID)
 }
 
 func (l NodeList) NPages() int {
@@ -404,4 +407,228 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int, sy
 	rows.Close()
 
 	return &out, nil
+}
+
+type Stats struct {
+	Client    Client
+	NetworkID int
+	Country   string
+	Synced    string
+}
+
+type AllStats []Stats
+
+type StatsFilterFn func(Stats) bool
+
+type Count struct {
+	Key   string
+	Count int
+}
+
+func (s AllStats) CountClientName(filters ...StatsFilterFn) []Count {
+	count := map[string]int{}
+
+	for _, stat := range s {
+		skip := false
+		for _, filter := range filters {
+			if !filter(stat) {
+				skip = true
+				break
+			}
+		}
+
+		if skip {
+			continue
+		}
+
+		v, ok := count[stat.Client.Name]
+		if !ok {
+			v = 0
+		}
+
+		v += 1
+		count[stat.Client.Name] = v
+	}
+
+	out := make([]Count, 0, len(count))
+
+	for key, value := range count {
+		out = append(out, Count{
+			Key:   key,
+			Count: value,
+		})
+	}
+
+	slices.SortFunc(out, func(a, b Count) int {
+		if a.Count == b.Count {
+			return strings.Compare(a.Key, b.Key)
+		}
+
+		return a.Count - b.Count
+	})
+
+	return out
+}
+
+type Client struct {
+	Name     string
+	Version  string
+	OS       string
+	Language string
+}
+
+func parseClientName(clientName string) *Client {
+	clientName = strings.ToLower(clientName)
+
+	if clientName == "" {
+		return nil
+	}
+
+	if clientName == "server" {
+		return nil
+	}
+
+	if strings.HasPrefix(clientName, "nimbus-eth1") {
+		newClientName := make([]rune, 0, len(clientName))
+		for _, c := range clientName {
+			switch c {
+			case '[', ']', ':', ',':
+				// NOOP
+			default:
+				newClientName = append(newClientName, c)
+			}
+		}
+
+		parts := strings.Split(string(newClientName), " ")
+
+		if len(parts) != 7 {
+			log.Error("nimbus-eth1 not valid", "client_name", clientName)
+		}
+
+		return &Client{
+			Name:     parts[0],
+			Version:  parts[1],
+			OS:       parts[2],
+			Language: "nim",
+		}
+	}
+
+	parts := strings.Split(strings.ToLower(clientName), "/")
+
+	if parts[0] == "" {
+		return nil
+	}
+
+	switch len(parts) {
+	case 1:
+		return &Client{
+			Name: parts[0],
+		}
+	case 2:
+		return &Client{
+			Name:    parts[0],
+			Version: parts[1],
+		}
+	case 3:
+		lang := ""
+
+		if parts[0] == "reth" {
+			lang = "rust"
+		} else if parts[0] == "geth" {
+			lang = "go"
+		} else {
+			log.Error("not reth or geth", "client_name", clientName)
+		}
+
+		return &Client{
+			Name:     parts[0],
+			Version:  parts[1],
+			OS:       parts[2],
+			Language: lang,
+		}
+	case 4:
+		return &Client{
+			Name:     parts[0],
+			Version:  parts[1],
+			OS:       parts[2],
+			Language: parts[3],
+		}
+	case 5:
+		return &Client{
+			// Name:     parts[0] + "/" + parts[1],
+			Name:     parts[0],
+			Version:  parts[2],
+			OS:       parts[3],
+			Language: parts[4],
+		}
+	case 6:
+		if parts[0] == "q-client" {
+			return &Client{
+				Name:     parts[0],
+				Version:  parts[1],
+				OS:       parts[4],
+				Language: parts[5],
+			}
+		}
+	case 7:
+		return &Client{
+			Name:     parts[0],
+			Version:  parts[4],
+			OS:       parts[5],
+			Language: parts[6],
+		}
+	}
+
+	log.Error("could not parse client", "client_name", clientName)
+
+	return nil
+}
+
+func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
+	rows, err := db.db.QueryContext(
+		ctx,
+		`
+			SELECT
+				client_name,
+				crawled.network_id,
+				coalesce(country, ''),
+				updated_at,
+				coalesce(blocks.timestamp, '')
+			FROM crawled_nodes AS crawled
+			LEFT JOIN blocks ON (
+				crawled.head_hash = blocks.block_hash
+				AND crawled.network_id = blocks.network_id
+			)
+		`,
+	)
+	if err != nil {
+		return AllStats{}, fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	allStats := make([]Stats, 1024)
+
+	for rows.Next() {
+		stats := Stats{}
+		name := ""
+		updatedAt := ""
+		blockTimestamp := ""
+
+		err = rows.Scan(
+			&name,
+			&stats.NetworkID,
+			&stats.Country,
+			&updatedAt,
+			&blockTimestamp,
+		)
+
+		client := parseClientName(name)
+		if client != nil {
+			stats.Synced = isSynced(updatedAt, blockTimestamp)
+			stats.Client = *client
+			allStats = append(allStats, stats)
+		}
+	}
+
+	return AllStats(allStats), nil
 }
