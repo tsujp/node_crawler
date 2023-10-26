@@ -63,6 +63,16 @@ var (
 			"stat_name",
 		},
 	)
+	DatabaseRetries = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "database_retries_total",
+			Help:      "Number of retries per retry count",
+		},
+		[]string{
+			"retry",
+		},
+	)
 )
 
 func boolToStatus(b bool) string {

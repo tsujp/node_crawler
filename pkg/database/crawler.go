@@ -1,12 +1,14 @@
 package database
 
 import (
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"net"
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/metrics"
 )
@@ -144,6 +146,13 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 		return fmt.Errorf("geoip failed: %w", err)
 	}
 
+	if len(node.BlockHeaders) != 0 {
+		err = db.InsertBlocks(node.BlockHeaders, node.Info.NetworkID)
+		if err != nil {
+			return fmt.Errorf("inserting blocks failed: %w", err)
+		}
+	}
+
 	_, err = db.ExecRetryBusy(
 		`
 			INSERT INTO crawled_nodes (
@@ -200,9 +209,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				city = coalesce(excluded.city, city),
 				latitude = coalesce(excluded.latitude, latitude),
 				longitude = coalesce(excluded.longitude, longitude),
-				sequence = coalesce(excluded.sequence, sequence)
-			RETURNING
-				id;
+				sequence = coalesce(excluded.sequence, sequence);
 
 			INSERT INTO discovered_nodes (
 				id,
@@ -260,13 +267,6 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 		return fmt.Errorf("exec failed: %w", err)
 	}
 
-	if len(node.BlockHeaders) != 0 {
-		err = db.InsertBlocks(node.BlockHeaders, node.Info.NetworkID)
-		if err != nil {
-			return fmt.Errorf("inserting blocks failed: %w", err)
-		}
-	}
-
 	return nil
 }
 
@@ -295,17 +295,19 @@ func (db *DB) InsertBlocks(blocks []*types.Header, networkID uint64) error {
 
 	for _, block := range blocks {
 		start := time.Now()
-		_, err = stmt.Exec(
-			block.Hash().String(),
-			networkID,
-			time.Unix(int64(block.Time), 0).UTC().Format(time.DateTime),
-			block.Number.Uint64(),
-			block.ParentHash.String(),
-		)
+		_, err = retryBusy(func() (sql.Result, error) {
+			return stmt.Exec(
+				block.Hash().String(),
+				networkID,
+				time.Unix(int64(block.Time), 0).UTC().Format(time.DateTime),
+				block.Number.Uint64(),
+				block.ParentHash,
+			)
+		})
 		metrics.ObserveDBQuery("insert_block", time.Since(start), err)
 
 		if err != nil {
-			return fmt.Errorf("statement exec failed: %w", err)
+			log.Error("upsert block failed", "err", err)
 		}
 	}
 
