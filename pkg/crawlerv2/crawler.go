@@ -214,9 +214,12 @@ func (c *CrawlerV2) getClientInfo(
 		case *crawler.Error:
 			readError = msg
 			loop = false
+
+		// NOOP conditions
 		case *crawler.NewPooledTransactionHashes:
 		case *crawler.NewPooledTransactionHashes66:
-			// NOOP
+		case *crawler.Transactions:
+
 		default:
 			log.Info("message type not handled", "type", reflect.TypeOf(msg).String())
 		}
@@ -325,9 +328,22 @@ func (c *CrawlerV2) StartDaemon() error {
 func (c *CrawlerV2) updaterLoop() {
 	c.wg.Done()
 
+	// Sometimes after crawling, the node connects again
+	// immediately, so to help the database a bit, we can
+	// drop this node.
+	recentlyUpdated := fifomemory.New[enode.ID](64)
+
 	for {
 		metrics.NodeUpdateBacklog.Set(float64(len(c.ch)))
+
 		node := <-c.ch
+		nodeID := node.N.ID()
+
+		if recentlyUpdated.Contains(nodeID) {
+			continue
+		}
+
+		recentlyUpdated.Push(nodeID)
 
 		err := c.db.UpsertCrawledNode(node)
 		if err != nil {
