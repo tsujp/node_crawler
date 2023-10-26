@@ -191,6 +191,7 @@ func (c *CrawlerV2) getClientInfo(
 			loop = false
 
 		// NOOP conditions
+		case *crawler.NewBlockHashes:
 		case *crawler.NewPooledTransactionHashes:
 		case *crawler.NewPooledTransactionHashes66:
 		case *crawler.Transactions:
