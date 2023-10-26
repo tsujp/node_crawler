@@ -252,7 +252,7 @@ func (a *Api) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	clientNames := stats.CountClientName(
 		func(s database.Stats) bool {
-			return s.NetworkID == networkID
+			return networkID == -1 || s.NetworkID == networkID
 		},
 		func(s database.Stats) bool {
 			return synced == -1 ||
