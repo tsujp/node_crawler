@@ -174,8 +174,6 @@ func (c *CrawlerV2) getClientInfo(
 
 				break
 			}
-
-			_ = conn.Write(c.status)
 		case *crawler.Status:
 			gotStatus = true
 
@@ -183,6 +181,14 @@ func (c *CrawlerV2) getClientInfo(
 			nodeJSON.Info.HeadHash = msg.Head
 			nodeJSON.Info.NetworkID = msg.NetworkID
 
+			_ = conn.Write(crawler.Status{
+				ProtocolVersion: msg.ProtocolVersion,
+				NetworkID:       msg.NetworkID,
+				TD:              msg.TD,
+				Head:            msg.Genesis,
+				Genesis:         msg.Genesis,
+				ForkID:          msg.ForkID,
+			})
 			_ = conn.Write(crawler.GetBlockHeaders{
 				RequestId: 69420, // Just a random number
 				GetBlockHeadersPacket: &eth.GetBlockHeadersPacket{
@@ -325,7 +331,7 @@ func (c *CrawlerV2) updaterLoop() {
 
 		err := c.db.UpsertCrawledNode(node)
 		if err != nil {
-			log.Error("upsert crawled node failed", "err", err, "node_id", node.ID())
+			log.Error("upsert crawled node failed", "err", err, "node_id", node.TerminalString())
 		}
 
 		metrics.NodeUpdateInc(node.Direction, node.Error)

@@ -62,6 +62,10 @@ func (n *NodeJSON) ID() string {
 	return n.N.ID().String()
 }
 
+func (n *NodeJSON) TerminalString() string {
+	return n.N.ID().TerminalString()
+}
+
 func (n *NodeJSON) ConnectionType() string {
 	connType := ""
 
