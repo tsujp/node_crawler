@@ -301,7 +301,7 @@ func (db *DB) InsertBlocks(blocks []*types.Header, networkID uint64) error {
 				networkID,
 				time.Unix(int64(block.Time), 0).UTC().Format(time.DateTime),
 				block.Number.Uint64(),
-				block.ParentHash,
+				block.ParentHash.String(),
 			)
 		})
 		metrics.ObserveDBQuery("insert_block", time.Since(start), err)
