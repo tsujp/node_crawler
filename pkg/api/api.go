@@ -39,8 +39,6 @@ func New(address string, dbv2 *database.DB) *Api {
 		dbv2:    dbv2,
 	}
 
-	go api.dropCacheLoop()
-
 	return api
 }
 
@@ -274,7 +272,7 @@ func (a *Api) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	out := strings.ReplaceAll(sb.String(), "STYLE_REPLACE", "style")
 
-	_, err = w.Write([]byte(out))
+	_, _ = w.Write([]byte(out))
 }
 
 func (a *Api) HandleRequests(wg *sync.WaitGroup) {

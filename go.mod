@@ -11,9 +11,12 @@ require (
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-isatty v0.0.19
 	github.com/oschwald/geoip2-golang v1.9.0
+	github.com/prometheus/client_golang v1.14.0
 	github.com/protolambda/zrnt v0.30.0
 	github.com/protolambda/ztyp v0.2.2
 	github.com/urfave/cli/v2 v2.25.7
+	golang.org/x/exp v0.0.0-20230810033253-352e893a4cad
+	golang.org/x/text v0.12.0
 	modernc.org/sqlite v1.26.0
 )
 
@@ -78,7 +81,6 @@ require (
 	github.com/oschwald/maxminddb-golang v1.11.0 // indirect
 	github.com/peterh/liner v1.1.1-0.20190123174540-a2c9a5303de7 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
@@ -96,12 +98,10 @@ require (
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
-	golang.org/x/exp v0.0.0-20230810033253-352e893a4cad // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect

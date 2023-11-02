@@ -24,6 +24,8 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/params"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const ourPath = "github.com/ethereum/go-ethereum" // Path to our module
@@ -31,6 +33,8 @@ const ourPath = "github.com/ethereum/go-ethereum" // Path to our module
 // These variables are set at build-time by the linker when the build is
 // done by build/ci.go.
 var gitCommit, gitDate string
+
+var title = cases.Title(language.English)
 
 // VCSInfo represents the git repository state.
 type VCSInfo struct {
@@ -58,7 +62,7 @@ func VCS() (VCSInfo, bool) {
 func ClientName(clientIdentifier string) string {
 	git, _ := VCS()
 	return fmt.Sprintf("%s/v%v/%v-%v/%v",
-		strings.Title(clientIdentifier),
+		title.String(clientIdentifier),
 		params.VersionWithCommit(git.Commit, git.Date),
 		runtime.GOOS, runtime.GOARCH,
 		runtime.Version(),
