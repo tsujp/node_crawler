@@ -317,6 +317,9 @@ func (db *DB) InsertBlocks(blocks []*types.Header, networkID uint64) error {
 }
 
 func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
+	db.wLock.Lock()
+	defer db.wLock.Unlock()
+
 	if !node.EthNode {
 		err := db.UpdateNotEthNode(node)
 		if err != nil {

@@ -10,6 +10,9 @@ import (
 )
 
 func (d *DB) UpsertNode(node *enode.Node) error {
+	d.wLock.Lock()
+	defer d.wLock.Unlock()
+
 	var err error
 
 	start := time.Now()
