@@ -641,7 +641,6 @@ func parseClientName(clientName *string) *Client {
 		}
 	case 5:
 		return &Client{
-			// Name:     parts[0] + "/" + parts[1],
 			Name:     parts[0],
 			Version:  parts[2],
 			OS:       parts[3],
@@ -671,6 +670,11 @@ func parseClientName(clientName *string) *Client {
 }
 
 func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("get_stats", start, err)
+
 	rows, err := db.db.QueryContext(
 		ctx,
 		`

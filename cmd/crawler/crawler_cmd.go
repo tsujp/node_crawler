@@ -59,10 +59,10 @@ var (
 			&crawlerDBFlag,
 			&geoipdbFlag,
 			&listenAddrFlag,
-			&metricsAddress,
-			&nextCrawlFail,
-			&nextCrawlNotEth,
-			&nextCrawlSuccess,
+			&metricsAddressFlag,
+			&nextCrawlFailFlag,
+			&nextCrawlNotEthFlag,
+			&nextCrawlSuccessFlag,
 			&nodeFileFlag,
 			&nodeKeyFileFlag,
 			&nodeURLFlag,
@@ -170,9 +170,9 @@ func crawlNodesV2(cCtx *cli.Context) error {
 	db := database.NewDB(
 		sqlite,
 		geoipDB,
-		nextCrawlSuccess.Get(cCtx),
-		nextCrawlFail.Get(cCtx),
-		nextCrawlNotEth.Get(cCtx),
+		nextCrawlSuccessFlag.Get(cCtx),
+		nextCrawlFailFlag.Get(cCtx),
+		nextCrawlNotEthFlag.Get(cCtx),
 	)
 
 	err = db.CreateTables()
@@ -214,7 +214,7 @@ func crawlNodesV2(cCtx *cli.Context) error {
 	go db.TableStatsMetricsDaemon(1 * time.Minute)
 
 	// Start metrics server
-	metricsAddr := metricsAddress.Get(cCtx)
+	metricsAddr := metricsAddressFlag.Get(cCtx)
 	log.Info("starting metrics server", "address", metricsAddr)
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(metricsAddr, nil)

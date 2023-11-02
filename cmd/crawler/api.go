@@ -24,7 +24,8 @@ var (
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
 			&dropNodesTimeFlag,
-			&metricsAddress,
+			&metricsAddressFlag,
+			&statsUpdateFrequencyFlag,
 		},
 	}
 )
@@ -39,16 +40,21 @@ func startAPI(cCtx *cli.Context) error {
 	}
 	defer db.Close()
 
-	var wg sync.WaitGroup
-	wg.Add(3)
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
 
 	// Start the API deamon
-	apiAddress := cCtx.String(apiListenAddrFlag.Name)
-	apiDeamon := api.New(apiAddress, database.NewAPIDB(db))
-	go apiDeamon.HandleRequests(&wg)
+	api := api.New(
+		database.NewAPIDB(db),
+		statsUpdateFrequencyFlag.Get(cCtx),
+	)
+	go api.StartServer(
+		wg,
+		apiListenAddrFlag.Get(cCtx),
+	)
 
 	// Start metrics server
-	metricsAddr := metricsAddress.Get(cCtx)
+	metricsAddr := metricsAddressFlag.Get(cCtx)
 	log.Info("starting metrics server", "address", metricsAddr)
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(metricsAddr, nil)
