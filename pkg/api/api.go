@@ -26,7 +26,7 @@ type Api struct {
 	dbv2    *database.DB
 }
 
-func New(address string, sdb *sql.DB, dbv2 *database.DB) *Api {
+func New(address string, dbv2 *database.DB) *Api {
 	cache, err := lru.New(256)
 	if err != nil {
 		return nil
@@ -35,7 +35,7 @@ func New(address string, sdb *sql.DB, dbv2 *database.DB) *Api {
 	api := &Api{
 		address: address,
 		cache:   cache,
-		db:      sdb,
+		db:      nil,
 		dbv2:    dbv2,
 	}
 
@@ -110,7 +110,7 @@ func setQuery(url *url.URL, key, value string) *url.URL {
 
 func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	var pageNumber int
-	var networkID int
+	var networkID int64
 	var synced int
 	var err error
 
@@ -142,7 +142,7 @@ func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		redirectURL = setQuery(redirectURL, "network", "1")
 		redirect = true
 	} else {
-		networkID, err = strconv.Atoi(networkIDStr)
+		networkID, err = strconv.ParseInt(networkIDStr, 10, 64)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
@@ -192,7 +192,7 @@ func (a *Api) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Api) handleRoot(w http.ResponseWriter, r *http.Request) {
-	var networkID int
+	var networkID int64
 	var synced int
 	var err error
 
@@ -206,7 +206,7 @@ func (a *Api) handleRoot(w http.ResponseWriter, r *http.Request) {
 		redirectURL = setQuery(redirectURL, "network", "1")
 		redirect = true
 	} else {
-		networkID, err = strconv.Atoi(networkIDStr)
+		networkID, err = strconv.ParseInt(networkIDStr, 10, 64)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
@@ -252,7 +252,7 @@ func (a *Api) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	clientNames := stats.CountClientName(
 		func(s database.Stats) bool {
-			return networkID == -1 || s.NetworkID == networkID
+			return networkID == -1 || (s.NetworkID != nil && *s.NetworkID == networkID)
 		},
 		func(s database.Stats) bool {
 			return synced == -1 ||

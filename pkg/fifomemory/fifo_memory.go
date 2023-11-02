@@ -22,7 +22,6 @@ func (m *FIFOMemory[T]) Push(value T) {
 	if m.full {
 		m.memory[m.pos] = value
 		m.pos = (m.pos + 1) % m.size
-
 		return
 	}
 

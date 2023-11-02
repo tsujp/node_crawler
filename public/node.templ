@@ -3,6 +3,7 @@ package public
 import "github.com/ethereum/node-crawler/pkg/database"
 import "strconv"
 import "fmt"
+import "encoding/hex"
 
 templ NodeTable(nt database.NodeTable) {
 	<div style="margin: 1em;">
@@ -11,11 +12,11 @@ templ NodeTable(nt database.NodeTable) {
 			<tbody>
 				<tr>
 					<td>ID</td>
-					<td>{ nt.ID }</td>
+					<td>{ nt.NodeID() }</td>
 				</tr>
 				<tr>
 					<td>Client Name</td>
-					<td>{ nt.ClientName }</td>
+					<td>{ database.StringOrEmpty(nt.ClientName) }</td>
 				</tr>
 				<tr>
 					<td>Last Update</td>
@@ -23,55 +24,51 @@ templ NodeTable(nt database.NodeTable) {
 				</tr>
 				<tr>
 					<td>Enode</td>
-					<td>{ nt.Enode }</td>
+					<td>{ database.StringOrEmpty(nt.Enode) }</td>
 				</tr>
 				<tr>
 					<td>RLPx Version</td>
-					<td>{ nt.RlpxVersion }</td>
+					<td>{ nt.RLPXVersion() }</td>
 				</tr>
 				<tr>
 					<td>Capabilities</td>
-					<td>{ nt.Capabilities }</td>
+					<td>{ database.StringOrEmpty(nt.Capabilities) }</td>
 				</tr>
 				<tr>
 					<td>Network ID</td>
-					if nt.NetworkID == -1 {
-						<td></td>
-					} else {
-						<td>{ nt.NetworkName() } ({ strconv.Itoa(nt.NetworkID) })</td>
-					}
+					<td>{ nt.NetworkID() }</td>
 				</tr>
 				<tr>
 					<td>Fork ID</td>
-					<td>{ nt.ForkID }</td>
+					<td>{ hex.EncodeToString(nt.ForkID[:]) }</td>
 				</tr>
 				<tr>
 					<td>Next Fork ID</td>
-					<td>{ nt.NextForkID }</td>
+					if nt.NextForkID != nil {
+						<td>{ strconv.FormatUint(*nt.NextForkID, 10) }</td>
+					} else {
+						<td></td>
+					}
 				</tr>
 				<tr>
 					<td>Head Hash</td>
 					<td>{ nt.HeadHashLine() }</td>
 				</tr>
 				<tr>
-					<td>Sequence</td>
-					<td>{ nt.Sequence }</td>
-				</tr>
-				<tr>
 					<td>IP Address</td>
-					<td>{ nt.IP }</td>
+					<td>{ database.StringOrEmpty(nt.IP) }</td>
 				</tr>
 				<tr>
 					<td>Connection Type</td>
-					<td>{ nt.ConnectionType }</td>
+					<td>{ database.StringOrEmpty(nt.ConnectionType) }</td>
 				</tr>
 				<tr>
 					<td>Country</td>
-					<td>{ nt.Country }</td>
+					<td>{ database.StringOrEmpty(nt.Country) }</td>
 				</tr>
 				<tr>
 					<td>City</td>
-					<td>{ nt.City }</td>
+					<td>{ database.StringOrEmpty(nt.City) }</td>
 				</tr>
 				<tr>
 					<td>Next Crawl (Scheduled)</td>
@@ -99,7 +96,7 @@ templ NodeTable(nt database.NodeTable) {
 			<tbody>
 				for _, row := range nt.History {
 					<tr>
-						<td>{ row.CrawledAt }</td>
+						<td>{ row.CrawledAt.UTC().Format(database.DateFormat) }</td>
 						<td>{ row.Direction }</td>
 						<td>{ row.Error }</td>
 					</tr>
@@ -123,7 +120,7 @@ templ NodeList(nodes database.NodeList) {
 			<div style="display:none">
 				for _, networkID := range nodes.Networks {
 					<a href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d", networkID, nodes.PageNumber)) }>
-						{ nodes.NetworkName(networkID) }
+						{ database.NetworkName(&networkID) }
 					</a>
 				}
 			</div>
@@ -138,7 +135,7 @@ templ NodeList(nodes database.NodeList) {
 				>
 					All (-1)
 				</a>
-				for _, networkID := range []int{1, 5, 17000, 11155111} {
+				for _, networkID := range []int64{1, 5, 17000, 11155111} {
 					<a
  						class={ 
 							pageButton(),
@@ -147,7 +144,7 @@ templ NodeList(nodes database.NodeList) {
 						 }
  						href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&synced=%d", networkID, nodes.PageNumber, nodes.Synced)) }
 					>
-						{ nodes.NetworkName(networkID) }
+						{ database.NetworkName(&networkID) }
 					</a>
 				}
 			</div>
@@ -196,10 +193,18 @@ templ NodeList(nodes database.NodeList) {
 				<tbody>
 					for _, row := range nodes.List {
 						<tr>
-							<td><a href={ templ.URL("/nodes/" + row.ID) }>{ row.ID[:8] }</a></td>
-							<td>{ row.ClientName }</td>
-							<td title={ row.UpdatedAt }>{ row.SinceUpdate() }</td>
-							<td>{ row.Country }</td>
+							<td><a href={ templ.URL("/nodes/" + row.NodeID()) }>{ row.NodeID()[:8] }</a></td>
+							if row.ClientName != nil {
+								<td>{ *row.ClientName }</td>
+							} else {
+								<td></td>
+							}
+							<td title={ row.UpdatedAt.UTC().Format(database.DateFormat) }>{ row.SinceUpdate() }</td>
+							if row.Country != nil {
+								<td>{ *row.Country }</td>
+							} else {
+								<td></td>
+							}
 							<td>{ row.IsSynced() }</td>
 						</tr>
 					}
@@ -262,7 +267,7 @@ templ spacer() {
 	</div>
 }
 
-templ pageNumberButton(networkID int, pageNumber int, isPage bool, synced int) {
+templ pageNumberButton(networkID int64, pageNumber int, isPage bool, synced int) {
 	<a
  		href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&synced=%d", networkID, pageNumber, synced)) }
  		class={ 
@@ -289,7 +294,7 @@ css pageButtonInactive() {
 	border: 2px solid #eee;
 }
 
-templ Stats(clients []database.Count, maxValue int, networkID int, synced int) {
+templ Stats(clients []database.Count, maxValue int, networkID int64, synced int) {
 	<div style="display: flex; flex-direction: column; padding: 1em; gap: 1em;">
 		<div style="display: flex; flex-direction: row; gap: 0.5em;">
 			<a
@@ -302,7 +307,7 @@ templ Stats(clients []database.Count, maxValue int, networkID int, synced int) {
 			>
 				All (-1)
 			</a>
-			for _, netID := range []int{1, 5, 17000, 11155111} {
+			for _, netID := range []int64{1, 5, 17000, 11155111} {
 				<a
 					class={ 
 						pageButton(),
@@ -311,7 +316,7 @@ templ Stats(clients []database.Count, maxValue int, networkID int, synced int) {
 					 }
 					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", netID, synced)) }
 				>
-					{ database.NetworkName(netID) } ({ strconv.Itoa(netID) })
+					{ database.NetworkName(&netID) } ({ strconv.FormatInt(netID, 10) })
 				</a>
 			}
 		</div>

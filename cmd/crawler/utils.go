@@ -30,18 +30,14 @@ func setPragma(db *sql.DB, query string, expected string) error {
 }
 
 func openSQLiteDB(
-	name,
-	autovacuum string,
+	name string,
 	busyTimeout uint64,
+	autovacuum string,
+	journalMode string,
 ) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", name)
 	if err != nil {
 		return nil, fmt.Errorf("opening database failed: %w", err)
-	}
-
-	err = setPragma(db, "PRAGMA auto_vacuum = "+autovacuum, "")
-	if err != nil {
-		return nil, fmt.Errorf("setting auto_vacuum failed: %w", err)
 	}
 
 	err = setPragma(db, fmt.Sprintf("PRAGMA busy_timeout = %d", busyTimeout), fmt.Sprintf("%d", busyTimeout))
@@ -49,14 +45,23 @@ func openSQLiteDB(
 		return nil, fmt.Errorf("setting busy_timeout failed: %w", err)
 	}
 
-	err = setPragma(db, "PRAGMA journal_mode = WAL", "wal")
-	if err != nil {
-		return nil, fmt.Errorf("setting journal_mode = WAL failed: %w", err)
+	if autovacuum != "" {
+		err = setPragma(db, "PRAGMA auto_vacuum = "+autovacuum, "")
+		if err != nil {
+			return nil, fmt.Errorf("setting auto_vacuum failed: %w", err)
+		}
 	}
 
-	err = setPragma(db, "PRAGMA synchronous = NORMAL", "")
-	if err != nil {
-		return nil, fmt.Errorf("setting synchronous = NORMAL failed: %w", err)
+	if journalMode != "" {
+		err = setPragma(db, "PRAGMA journal_mode = WAL", "wal")
+		if err != nil {
+			return nil, fmt.Errorf("setting journal_mode = WAL failed: %w", err)
+		}
+
+		err = setPragma(db, "PRAGMA synchronous = NORMAL", "")
+		if err != nil {
+			return nil, fmt.Errorf("setting synchronous = NORMAL failed: %w", err)
+		}
 	}
 
 	return db, nil

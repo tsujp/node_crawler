@@ -2,8 +2,11 @@ package database
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,66 +17,113 @@ import (
 )
 
 type NodeTableHistory struct {
-	CrawledAt string
+	CrawledAt time.Time
 	Direction string
 	Error     string
 }
 
+type ForkID [4]byte
+
+func Uint32ToForkID(i uint32) ForkID {
+	fid := ForkID{}
+	binary.BigEndian.PutUint32(fid[:], i)
+
+	return fid
+}
+
+func BytesToUnit32(b []byte) uint32 {
+	return binary.BigEndian.Uint32(b)
+}
+
 type NodeTable struct {
-	ID                string
-	updatedAt         string
-	Enode             string
-	ClientName        string
-	RlpxVersion       string
-	Capabilities      string
-	NetworkID         int
-	ForkID            string
-	NextForkID        string
-	BlockHeight       string
-	HeadHash          string
-	HeadHashTimestamp string
-	IP                string
-	ConnectionType    string
-	Country           string
-	City              string
-	Latitude          float64
-	Longitude         float64
-	Sequence          string
-	nextCrawl         string
+	nodeID         []byte
+	updatedAt      *time.Time
+	Enode          *string
+	ClientName     *string
+	RlpxVersion    *int64
+	Capabilities   *string
+	networkID      *int64
+	ForkID         *ForkID
+	NextForkID     *uint64
+	HeadHash       *[]byte
+	HeadHashTime   *time.Time
+	IP             *string
+	ConnectionType *string
+	Country        *string
+	City           *string
+	Latitude       *float64
+	Longitude      *float64
+	nextCrawl      *time.Time
 
 	History []NodeTableHistory
 }
 
+func (n NodeTable) RLPXVersion() string {
+	if n.RlpxVersion == nil {
+		return ""
+	}
+
+	return strconv.FormatInt(*n.RlpxVersion, 10)
+}
+
+func StringOrEmpty(v *string) string {
+	if v == nil {
+		return ""
+	}
+
+	return *v
+}
+
+func (n NodeTable) NodeID() string {
+	return hex.EncodeToString(n.nodeID)
+}
+
+func (n NodeTable) NetworkID() string {
+	if n.networkID == nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%s (%d)", NetworkName(n.networkID), *n.networkID)
+}
+
 func (n NodeTable) YOffsetPercent() int {
-	return 100 - int((n.Latitude+90)/180*100)
+	if n.Latitude == nil {
+		return 0
+	}
+
+	return 100 - int((*n.Latitude+90)/180*100)
 }
 
 func (n NodeTable) XOffsetPercent() int {
-	return int((n.Longitude + 180) / 360 * 100)
+	if n.Longitude == nil {
+		return 0
+	}
+
+	return int((*n.Longitude + 180) / 360 * 100)
 }
+
+var DateFormat = "2006-01-02 15:04:05 MST"
 
 func (n NodeTable) HeadHashLine() string {
-	if n.HeadHashTimestamp == "" {
-		return n.HeadHash
+	if n.HeadHashTime == nil {
+		return hex.EncodeToString(*n.HeadHash)
 	}
 
-	return fmt.Sprintf("%s (%s)", n.HeadHash, n.HeadHashTimestamp)
+	return fmt.Sprintf(
+		"%s (%s)",
+		hex.EncodeToString(*n.HeadHash),
+		n.HeadHashTime.UTC().Format(DateFormat),
+	)
 }
 
-func isSynced(ts1 string, ts2 string) string {
-	t1, err := time.ParseInLocation(time.DateTime, ts1, time.UTC)
-	if err != nil {
-		return "Unknown"
-	}
-
-	t2, err := time.ParseInLocation(time.DateTime, ts2, time.UTC)
-	if err != nil {
+func isSynced(updatedAt *time.Time, headHash *time.Time) string {
+	if updatedAt == nil || headHash == nil {
 		return "Unknown"
 	}
 
 	// If head hash is within one minute of the crawl time,
 	// we can consider the node in sync
-	if t1.Sub(t2).Abs() < time.Minute {
+	if updatedAt.Sub(*headHash).Abs() < time.Minute {
 		return "Yes"
 	}
 
@@ -81,16 +131,15 @@ func isSynced(ts1 string, ts2 string) string {
 }
 
 func (n NodeTable) IsSynced() string {
-	return isSynced(n.updatedAt, n.HeadHashTimestamp)
+	return isSynced(n.updatedAt, n.HeadHashTime)
 }
 
-func sinceUpdate(updatedAt string) string {
-	t, err := time.ParseInLocation(time.DateTime, updatedAt, time.UTC)
-	if err != nil {
-		return updatedAt
+func sinceUpdate(updatedAt *time.Time) string {
+	if updatedAt == nil {
+		return "Never"
 	}
 
-	since := time.Since(t)
+	since := time.Since(*updatedAt)
 	if since < 0 {
 		return "In " + (-since).Truncate(time.Second).String()
 	}
@@ -99,31 +148,34 @@ func sinceUpdate(updatedAt string) string {
 }
 
 func (n NodeTable) UpdatedAt() string {
-	if n.updatedAt == "" {
-		return "Never crawled"
-	}
-
-	since := sinceUpdate(n.updatedAt)
-	return fmt.Sprintf("%s (%s)", since, n.updatedAt)
+	return fmt.Sprintf(
+		"%s (%s)",
+		sinceUpdate(n.updatedAt),
+		n.updatedAt.UTC().Format(DateFormat),
+	)
 }
 
 func (n NodeTable) NextCrawl() string {
-	if n.nextCrawl == "" {
+	if n.nextCrawl == nil {
 		return "Never"
 	}
 
-	return fmt.Sprintf("%s (%s)", sinceUpdate(n.nextCrawl), n.nextCrawl)
+	return fmt.Sprintf("%s (%s)", sinceUpdate(n.nextCrawl), n.nextCrawl.UTC().Format(DateFormat))
 }
 
-func NetworkName(networkID int) string {
-	switch networkID {
-	case int(params.MainnetChainConfig.ChainID.Int64()):
+func NetworkName(networkID *int64) string {
+	if networkID == nil {
+		return "Unknown"
+	}
+
+	switch *networkID {
+	case params.MainnetChainConfig.ChainID.Int64():
 		return "Mainnet"
-	case int(params.HoleskyChainConfig.ChainID.Int64()):
+	case params.HoleskyChainConfig.ChainID.Int64():
 		return "Holesky"
-	case int(params.SepoliaChainConfig.ChainID.Int64()):
+	case params.SepoliaChainConfig.ChainID.Int64():
 		return "Sepolia"
-	case int(params.GoerliChainConfig.ChainID.Int64()):
+	case params.GoerliChainConfig.ChainID.Int64():
 		return "Goerli"
 	default:
 		return "Unknown"
@@ -131,76 +183,89 @@ func NetworkName(networkID int) string {
 }
 
 func (n NodeTable) NetworkName() string {
-	return NetworkName(n.NetworkID)
+	return NetworkName(n.networkID)
 }
 
 func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, error) {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("get_node_table", time.Since(start), err)
+	defer metrics.ObserveDBQuery("get_node_table", start, err)
+
+	nodeIDBytes, err := hex.DecodeString(nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("decoding node id failed: %w", err)
+	}
 
 	row := db.db.QueryRowContext(
 		ctx,
 		`
 			SELECT
-				disc.id,
-				coalesce(crawled.updated_at, ''),
-				node,
-				coalesce(client_name, ''),
-				coalesce(CAST(rlpx_version AS TEXT), ''),
-				coalesce(capabilities, ''),
-				coalesce(crawled.network_id, -1),
-				coalesce(fork_id, ''),
-				coalesce(CAST(next_fork_id AS TEXT), ''),
-				coalesce(block_height, ''),
-				coalesce(head_hash, ''),
-				coalesce(blocks.timestamp, ''),
-				coalesce(disc.ip_address, ''),
-				coalesce(connection_type, ''),
-				coalesce(country, ''),
-				coalesce(city, ''),
-				coalesce(latitude, 0),
-				coalesce(longitude, 0),
-				coalesce(CAST(sequence AS TEXT), ''),
-				coalesce(next_crawl, '')
+				disc.node_id,
+				crawled.updated_at,
+				network_address,
+				client_name,
+				rlpx_version,
+				capabilities,
+				crawled.network_id,
+				fork_id,
+				next_fork_id,
+				head_hash,
+				blocks.timestamp,
+				disc.ip_address,
+				connection_type,
+				country,
+				city,
+				latitude,
+				longitude,
+				next_crawl
 			FROM discovered_nodes AS disc
-			LEFT JOIN crawled_nodes AS crawled ON (disc.id = crawled.id)
+			LEFT JOIN crawled_nodes AS crawled ON (disc.node_id = crawled.node_id)
 			LEFT JOIN blocks ON (
 				crawled.head_hash = blocks.block_hash
 				AND crawled.network_id = blocks.network_id
 			)
-			WHERE disc.id = ?;
+			WHERE disc.node_id = ?;
 		`,
-		nodeID,
+		nodeIDBytes,
 	)
 
 	nodePage := new(NodeTable)
 
+	var updatedAtInt, headHashTimeInt, nextCrawlInt *int64
+	var forkIDInt *uint32
+
 	err = row.Scan(
-		&nodePage.ID,
-		&nodePage.updatedAt,
+		&nodePage.nodeID,
+		&updatedAtInt,
 		&nodePage.Enode,
 		&nodePage.ClientName,
 		&nodePage.RlpxVersion,
 		&nodePage.Capabilities,
-		&nodePage.NetworkID,
-		&nodePage.ForkID,
+		&nodePage.networkID,
+		&forkIDInt,
 		&nodePage.NextForkID,
-		&nodePage.BlockHeight,
 		&nodePage.HeadHash,
-		&nodePage.HeadHashTimestamp,
+		&headHashTimeInt,
 		&nodePage.IP,
 		&nodePage.ConnectionType,
 		&nodePage.Country,
 		&nodePage.City,
 		&nodePage.Latitude,
 		&nodePage.Longitude,
-		&nodePage.Sequence,
-		&nodePage.nextCrawl,
+		&nextCrawlInt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("row scan failed: %w", err)
+	}
+
+	nodePage.updatedAt = int64PrtToTimePtr(updatedAtInt)
+	nodePage.HeadHashTime = int64PrtToTimePtr(headHashTimeInt)
+	nodePage.nextCrawl = int64PrtToTimePtr(nextCrawlInt)
+
+	if forkIDInt != nil {
+		fid := Uint32ToForkID(*forkIDInt)
+		nodePage.ForkID = &fid
 	}
 
 	rows, err := db.db.QueryContext(
@@ -212,10 +277,10 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				coalesce(error, '')
 			FROM crawl_history
 			WHERE
-				id = ?
+				node_id = ?
 			LIMIT 10
 		`,
-		nodeID,
+		nodeIDBytes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("history query failed: %w", err)
@@ -224,15 +289,18 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 
 	for rows.Next() {
 		history := NodeTableHistory{}
+		var crawledAtInt int64
 
 		err = rows.Scan(
-			&history.CrawledAt,
+			&crawledAtInt,
 			&history.Direction,
 			&history.Error,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("history row scan failed: %w", err)
 		}
+
+		history.CrawledAt = time.Unix(crawledAtInt, 0)
 
 		nodePage.History = append(nodePage.History, history)
 	}
@@ -245,12 +313,25 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 	return nodePage, nil
 }
 
+func int64PrtToTimePtr(i *int64) *time.Time {
+	if i == nil {
+		return nil
+	}
+
+	u := time.Unix(*i, 0)
+	return &u
+}
+
 type NodeListRow struct {
-	ID                string
-	UpdatedAt         string
-	ClientName        string
-	Country           string
-	HeadHashTimestamp string
+	nodeID            []byte
+	UpdatedAt         *time.Time
+	ClientName        *string
+	Country           *string
+	HeadHashTimestamp *time.Time
+}
+
+func (n NodeListRow) NodeID() string {
+	return hex.EncodeToString(n.nodeID)
 }
 
 func (n NodeListRow) SinceUpdate() string {
@@ -267,25 +348,21 @@ type NodeList struct {
 	Synced        int
 	Offset        int
 	Total         int
-	NetworkFilter int
+	NetworkFilter int64
 	List          []NodeListRow
 
-	Networks []int
-}
-
-func (_ NodeList) NetworkName(networkID int) string {
-	return fmt.Sprintf("%s (%d)", NetworkName(networkID), networkID)
+	Networks []int64
 }
 
 func (l NodeList) NPages() int {
 	return int(math.Ceil(float64(l.Total) / float64(l.PageSize)))
 }
 
-func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int, synced int) (*NodeList, error) {
+func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int64, synced int) (*NodeList, error) {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("get_node_list", time.Since(start), err)
+	defer metrics.ObserveDBQuery("get_node_list", start, err)
 
 	pageSize := 10
 	offset := (pageNumber - 1) * pageSize
@@ -294,11 +371,11 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int, sy
 		ctx,
 		`
 			SELECT
-				id,
+				node_id,
 				updated_at,
-				coalesce(client_name, ''),
-				coalesce(country, ''),
-				coalesce(blocks.timestamp, ''),
+				client_name,
+				country,
+				blocks.timestamp,
 				COUNT(*) OVER () AS total
 			FROM crawled_nodes AS crawled
 			LEFT JOIN blocks ON (
@@ -314,17 +391,17 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int, sy
 					?2 = -1  -- All
 					OR (     -- Not synced
 						(
-							abs(unixepoch(crawled.updated_at) - unixepoch(blocks.timestamp)) >= 60
+							abs(crawled.updated_at - blocks.timestamp) >= 60
 							OR blocks.timestamp IS NULL
 						)
 						AND ?2 = 0
 					)
 					OR (     -- Synced
-						abs(unixepoch(crawled.updated_at) - unixepoch(blocks.timestamp)) < 60
+						abs(crawled.updated_at - blocks.timestamp) < 60
 						AND ?2 = 1
 					)
 				)
-			ORDER BY id
+			ORDER BY node_id
 			LIMIT ?3
 			OFFSET ?4
 		`,
@@ -345,23 +422,28 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int, sy
 		Offset:        offset,
 		Total:         0,
 		List:          []NodeListRow{},
-		Networks:      []int{},
+		Networks:      []int64{},
 		NetworkFilter: networkID,
 	}
 
 	for rows.Next() {
 		row := NodeListRow{}
+		var updatedAtInt, headHashTimeInt *int64
+
 		err = rows.Scan(
-			&row.ID,
-			&row.UpdatedAt,
+			&row.nodeID,
+			&updatedAtInt,
 			&row.ClientName,
 			&row.Country,
-			&row.HeadHashTimestamp,
+			&headHashTimeInt,
 			&out.Total,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan row failed: %w", err)
 		}
+
+		row.UpdatedAt = int64PrtToTimePtr(updatedAtInt)
+		row.HeadHashTimestamp = int64PrtToTimePtr(headHashTimeInt)
 
 		out.List = append(out.List, row)
 	}
@@ -389,7 +471,7 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int, sy
 	defer rows.Close()
 
 	for rows.Next() {
-		var networkID int
+		var networkID int64
 
 		err = rows.Scan(&networkID)
 		if err != nil {
@@ -411,8 +493,8 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int, sy
 
 type Stats struct {
 	Client    Client
-	NetworkID int
-	Country   string
+	NetworkID *int64
+	Country   *string
 	Synced    string
 }
 
@@ -477,20 +559,24 @@ type Client struct {
 	Language string
 }
 
-func parseClientName(clientName string) *Client {
-	clientName = strings.ToLower(clientName)
-
-	if clientName == "" {
+func parseClientName(clientName *string) *Client {
+	if clientName == nil {
 		return nil
 	}
 
-	if clientName == "server" {
+	name := strings.ToLower(*clientName)
+
+	if name == "" {
 		return nil
 	}
 
-	if strings.HasPrefix(clientName, "nimbus-eth1") {
-		newClientName := make([]rune, 0, len(clientName))
-		for _, c := range clientName {
+	if name == "server" {
+		return nil
+	}
+
+	if strings.HasPrefix(name, "nimbus-eth1") {
+		newClientName := make([]rune, 0, len(name))
+		for _, c := range name {
 			switch c {
 			case '[', ']', ':', ',':
 				// NOOP
@@ -502,7 +588,7 @@ func parseClientName(clientName string) *Client {
 		parts := strings.Split(string(newClientName), " ")
 
 		if len(parts) != 7 {
-			log.Error("nimbus-eth1 not valid", "client_name", clientName)
+			log.Error("nimbus-eth1 not valid", "client_name", name)
 		}
 
 		return &Client{
@@ -513,7 +599,7 @@ func parseClientName(clientName string) *Client {
 		}
 	}
 
-	parts := strings.Split(strings.ToLower(clientName), "/")
+	parts := strings.Split(strings.ToLower(name), "/")
 
 	if parts[0] == "" {
 		return nil
@@ -537,7 +623,7 @@ func parseClientName(clientName string) *Client {
 		} else if parts[0] == "geth" {
 			lang = "go"
 		} else {
-			log.Error("not reth or geth", "client_name", clientName)
+			log.Error("not reth or geth", "client_name", name)
 		}
 
 		return &Client{
@@ -579,7 +665,7 @@ func parseClientName(clientName string) *Client {
 		}
 	}
 
-	log.Error("could not parse client", "client_name", clientName)
+	log.Error("could not parse client", "client_name", name)
 
 	return nil
 }
@@ -591,9 +677,9 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 			SELECT
 				client_name,
 				crawled.network_id,
-				coalesce(country, ''),
+				country,
 				updated_at,
-				coalesce(blocks.timestamp, '')
+				blocks.timestamp
 			FROM crawled_nodes AS crawled
 			LEFT JOIN blocks ON (
 				crawled.head_hash = blocks.block_hash
@@ -610,17 +696,22 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 
 	for rows.Next() {
 		stats := Stats{}
-		name := ""
-		updatedAt := ""
-		blockTimestamp := ""
+		var name *string
+		var updatedAtInt, blockTimestampInt *int64
 
-		err = rows.Scan(
+		err := rows.Scan(
 			&name,
 			&stats.NetworkID,
 			&stats.Country,
-			&updatedAt,
-			&blockTimestamp,
+			&updatedAtInt,
+			&blockTimestampInt,
 		)
+		if err != nil {
+			return AllStats{}, fmt.Errorf("scan failed: %w", err)
+		}
+
+		updatedAt := int64PrtToTimePtr(updatedAtInt)
+		blockTimestamp := int64PrtToTimePtr(blockTimestampInt)
 
 		client := parseClientName(name)
 		if client != nil {

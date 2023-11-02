@@ -162,17 +162,17 @@
         "xc": "xc"
       },
       "locked": {
-        "lastModified": 1698527706,
-        "narHash": "sha256-j4VtaN4sMoYVndeZR2xC+KujDMpIDQjPOnyUSyUEtwE=",
-        "owner": "angaz",
+        "lastModified": 1698747860,
+        "narHash": "sha256-wZIHYbufaGXemwtk+lhcyAIZt4Oy54czjEUVH8pEBOQ=",
+        "owner": "a-h",
         "repo": "templ",
-        "rev": "274a918ed1986ea95d830fd7eb5b527ecaf3d386",
+        "rev": "3ff06f93131b3afdceeb463b5c37d2ab37faf1aa",
         "type": "github"
       },
       "original": {
-        "owner": "angaz",
-        "ref": "flake",
+        "owner": "a-h",
         "repo": "templ",
+        "rev": "3ff06f93131b3afdceeb463b5c37d2ab37faf1aa",
         "type": "github"
       }
     },

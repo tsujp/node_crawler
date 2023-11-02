@@ -13,13 +13,13 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("disc_upsert_node", time.Since(start), err)
+	defer metrics.ObserveDBQuery("disc_upsert_node", start, err)
 
 	_, err = d.ExecRetryBusy(
 		`
 			INSERT INTO discovered_nodes (
-				id,
-				node,
+				node_id,
+				network_address,
 				ip_address,
 				first_found,
 				last_found,
@@ -28,19 +28,19 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 				?,
 				?,
 				?,
-				CURRENT_TIMESTAMP,
-				CURRENT_TIMESTAMP,
-				CURRENT_TIMESTAMP
+				unixepoch(),
+				unixepoch(),
+				unixepoch()
 			)
-			ON CONFLICT (id) DO UPDATE
+			ON CONFLICT (node_id) DO UPDATE
 			SET
-				node = excluded.node,
+				network_address = excluded.network_address,
 				ip_address = excluded.ip_address,
-				last_found = CURRENT_TIMESTAMP
+				last_found = unixepoch()
 			WHERE
-				node != excluded.node
+				network_address != excluded.network_address
 		`,
-		node.ID().String(),
+		node.ID().Bytes(),
 		node.String(),
 		node.IP().String(),
 	)
@@ -55,15 +55,15 @@ func (d *DB) SelectDiscoveredNodeSlice(limit int) ([]*enode.Node, error) {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("select_disc_node_slice", time.Since(start), err)
+	defer metrics.ObserveDBQuery("select_disc_node_slice", start, err)
 
 	rows, err := d.db.Query(
 		`
 			SELECT
-				node
+				network_address
 			FROM discovered_nodes
 			WHERE
-				next_crawl < CURRENT_TIMESTAMP
+				next_crawl < unixepoch()
 			ORDER BY next_crawl ASC
 			LIMIT ?
 		`,
@@ -76,7 +76,7 @@ func (d *DB) SelectDiscoveredNodeSlice(limit int) ([]*enode.Node, error) {
 
 	out := make([]*enode.Node, 0, limit)
 	for rows.Next() {
-		enr := ""
+		var enr string
 
 		err = rows.Scan(&enr)
 		if err != nil {

@@ -58,8 +58,8 @@ type NodeJSON struct {
 	BlockHeaders []*types.Header
 }
 
-func (n *NodeJSON) ID() string {
-	return n.N.ID().String()
+func (n *NodeJSON) ID() []byte {
+	return n.N.ID().Bytes()
 }
 
 func (n *NodeJSON) TerminalString() string {

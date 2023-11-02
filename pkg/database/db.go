@@ -2,6 +2,8 @@ package database
 
 import (
 	"database/sql"
+	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"strconv"
@@ -17,9 +19,13 @@ type DB struct {
 	db      *sql.DB
 	geoipDB *geoip2.Reader
 
-	nextCrawlSucces string
-	nextCrawlFail   string
-	nextCrawlNotEth string
+	nextCrawlSucces int64
+	nextCrawlFail   int64
+	nextCrawlNotEth int64
+}
+
+func NewAPIDB(db *sql.DB) *DB {
+	return NewDB(db, nil, 0, 0, 0)
 }
 
 func NewDB(
@@ -33,75 +39,17 @@ func NewDB(
 		db:      db,
 		geoipDB: geoipDB,
 
-		nextCrawlSucces: strconv.Itoa(int(nextCrawlSucces.Seconds())) + " seconds",
-		nextCrawlFail:   strconv.Itoa(int(nextCrawlFail.Seconds())) + " seconds",
-		nextCrawlNotEth: strconv.Itoa(int(nextCrawlNotEth.Seconds())) + " seconds",
+		nextCrawlSucces: int64(nextCrawlSucces.Seconds()),
+		nextCrawlFail:   int64(nextCrawlFail.Seconds()),
+		nextCrawlNotEth: int64(nextCrawlNotEth.Seconds()),
 	}
 }
 
-func (d *DB) CreateTables() error {
-	_, err := d.db.Exec(`
-		CREATE TABLE IF NOT EXISTS discovered_nodes (
-			id			TEXT	PRIMARY KEY,
-			node		TEXT	NOT NULL,
-			ip_address	TEXT	NOT NULL,
-			first_found	TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			last_found	TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			next_crawl	TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP
-		) STRICT;
+//go:embed sql/schema.sql
+var schema string
 
-		CREATE INDEX IF NOT EXISTS id_next_crawl
-			ON discovered_nodes (id, next_crawl);
-		CREATE INDEX IF NOT EXISTS discovered_nodes_next_crawl_node
-			ON discovered_nodes (next_crawl, node);
-
-		CREATE TABLE IF NOT EXISTS crawled_nodes (
-			id				TEXT	PRIMARY KEY,
-			updated_at		TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			client_name		TEXT	DEFAULT NULL,
-			rlpx_version	INTEGER	DEFAULT NULL,
-			capabilities	TEXT	DEFAULT NULL,
-			network_id		INTEGER	DEFAULT NULL,
-			fork_id			TEXT	DEFAULT NULL,
-			next_fork_id	INTEGER	DEFAULT NULL,
-			block_height	TEXT	DEFAULT NULL,
-			head_hash		TEXT	DEFAULT NULL,
-			ip				TEXT	DEFAULT NULL,
-			connection_type	TEXT	DEFAULT NULL,
-			country			TEXT	DEFAULT NULL,
-			city			TEXT	DEFAULT NULL,
-			latitude		REAL	DEFAULT NULL,
-			longitude		REAL	DEFAULT NULL,
-			sequence		INTEGER	DEFAULT NULL
-		) STRICT;
-
-		CREATE INDEX IF NOT EXISTS id_last_seen
-			ON crawled_nodes (id, updated_at);
-		CREATE INDEX IF NOT EXISTS crawled_nodes_network_id
-			ON crawled_nodes (network_id);
-
-		CREATE TABLE IF NOT EXISTS crawl_history (
-			id			TEXT	NOT NULL,
-			crawled_at	TEXT	NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			direction	TEXT	NOT NULL,
-			error		TEXT	DEFAULT NULL,
-
-			PRIMARY KEY (id, crawled_at)
-		) STRICT;
-
-		CREATE TABLE IF NOT EXISTS blocks (
-			block_hash		TEXT	NOT NULL,
-			network_id		INTEGER NOT NULL,
-			timestamp		TEXT	NOT NULL,
-			block_number	INTEGER	NOT NULL,
-			parent_hash		TEXT	DEFAULT NULL,
-
-			PRIMARY KEY (block_hash, network_id)
-		) STRICT;
-
-		CREATE INDEX IF NOT EXISTS blocks_block_hash_timestamp
-			ON blocks (block_hash, timestamp);
-	`)
+func (db *DB) CreateTables() error {
+	_, err := db.db.Exec(schema)
 	if err != nil {
 		return fmt.Errorf("creating table discovered_nodes failed: %w", err)
 	}
@@ -109,24 +57,440 @@ func (d *DB) CreateTables() error {
 	return nil
 }
 
+func (db *DB) migrateDiscoveredNodes(old *sql.DB) error {
+	rows, err := old.Query(`
+		SELECT
+			id,
+			node,
+			ip_address,
+			unixepoch(first_found),
+			unixepoch(last_found),
+			unixepoch(next_crawl)
+		FROM discovered_nodes
+	`)
+	if err != nil {
+		return fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	tx, err := db.db.Begin()
+	if err != nil {
+		return fmt.Errorf("starting tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO discovered_nodes (
+			node_id,
+			network_address,
+			ip_address,
+			first_found,
+			last_found,
+			next_crawl
+		) VALUES (
+			?, ?, ?, ?, ?, ?
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("prepared statement failed: %w", err)
+	}
+	defer stmt.Close()
+
+	for rows.Next() {
+		var nodeID, networkAddress, ipAddress string
+		var firstFound, lastFound, nextCrawl int64
+
+		rows.Scan(
+			&nodeID,
+			&networkAddress,
+			&ipAddress,
+			&firstFound,
+			&lastFound,
+			&nextCrawl,
+		)
+
+		newID := make([]byte, len(nodeID)/2)
+		_, err := hex.Decode(newID, []byte(nodeID))
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = stmt.Exec(
+			newID,
+			networkAddress,
+			ipAddress,
+			firstFound,
+			lastFound,
+			nextCrawl,
+		)
+		if err != nil {
+			return fmt.Errorf("insert exec failed: %w", err)
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("tx commit failed: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) migrateBlocks(old *sql.DB) error {
+	rows, err := old.Query(`
+		SELECT
+			block_hash,
+			network_id,
+			unixepoch(timestamp),
+			block_number,
+			parent_hash
+		FROM blocks
+	`)
+	if err != nil {
+		return fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	tx, err := db.db.Begin()
+	if err != nil {
+		return fmt.Errorf("starting tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO blocks (
+			block_hash,
+			network_id,
+			timestamp,
+			block_number,
+			parent_hash
+		) VALUES (
+			?, ?, ?, ?, ?
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("prepared statement failed: %w", err)
+	}
+	defer stmt.Close()
+
+	for rows.Next() {
+		var blockHash, parentHash string
+		var networkID, timestamp, blockNumber int64
+
+		rows.Scan(
+			&blockHash,
+			&networkID,
+			&timestamp,
+			&blockNumber,
+			&parentHash,
+		)
+
+		blockHash = strings.TrimPrefix(blockHash, "0x")
+		parentHash = strings.TrimPrefix(parentHash, "0x")
+
+		newBlockHash := make([]byte, len(blockHash)/2)
+		_, err := hex.Decode(newBlockHash, []byte(blockHash))
+		if err != nil {
+			panic(err)
+		}
+		newParentHash := make([]byte, len(parentHash)/2)
+		_, err = hex.Decode(newParentHash, []byte(parentHash))
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = stmt.Exec(
+			newBlockHash,
+			networkID,
+			timestamp,
+			blockNumber,
+			newParentHash,
+		)
+		if err != nil {
+			return fmt.Errorf("insert exec failed: %w", err)
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("tx commit failed: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) migrateCrawlHistory(old *sql.DB) error {
+	rows, err := old.Query(`
+		SELECT
+			id,
+			unixepoch(crawled_at),
+			direction,
+			error
+		FROM crawl_history
+	`)
+	if err != nil {
+		return fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	tx, err := db.db.Begin()
+	if err != nil {
+		return fmt.Errorf("start tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO crawl_history (
+			node_id,
+			crawled_at,
+			direction,
+			error
+		) VALUES (
+			?, ?, ?, ?
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("prepared statement failed: %w", err)
+	}
+	defer stmt.Close()
+
+	for rows.Next() {
+		var id, direction string
+		var e *string
+		var crawledAt int64
+
+		rows.Scan(
+			&id,
+			&crawledAt,
+			&direction,
+			&e,
+		)
+
+		newID := make([]byte, len(id)/2)
+		_, err := hex.Decode(newID, []byte(id))
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = stmt.Exec(
+			newID,
+			crawledAt,
+			direction,
+			e,
+		)
+		if err != nil {
+			return fmt.Errorf("insert exec failed: %w", err)
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("commit tx failed: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) migrateCrawledNodes(old *sql.DB) error {
+	rows, err := old.Query(`
+		SELECT
+			id,
+			unixepoch(updated_at),
+			client_name,
+			rlpx_version,
+			capabilities,
+			network_id,
+			fork_id,
+			next_fork_id,
+			head_hash,
+			ip,
+			connection_type,
+			country,
+			city,
+			latitude,
+			longitude
+		FROM crawled_nodes
+	`)
+	if err != nil {
+		return fmt.Errorf("query failed: %w", err)
+	}
+	defer rows.Close()
+
+	tx, err := db.db.Begin()
+	if err != nil {
+		return fmt.Errorf("start tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO crawled_nodes (
+			node_id,
+			updated_at,
+			client_name,
+			rlpx_version,
+			capabilities,
+			network_id,
+			fork_id,
+			next_fork_id,
+			head_hash,
+			ip_address,
+			connection_type,
+			country,
+			city,
+			latitude,
+			longitude
+		) VALUES (
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("prepared statement failed: %w", err)
+	}
+	defer stmt.Close()
+
+	for rows.Next() {
+		var id string
+		var clientName, caps, forkID, headHash, ipAddress, connectionType, country, city *string
+		var updatedAt int64
+		var rlpxVersion, networkID, nextForkID *int64
+		var latitude, longitude *float64
+
+		rows.Scan(
+			&id,
+			&updatedAt,
+			&clientName,
+			&rlpxVersion,
+			&caps,
+			&networkID,
+			&forkID,
+			&nextForkID,
+			&headHash,
+			&ipAddress,
+			&connectionType,
+			&country,
+			&city,
+			&latitude,
+			&longitude,
+		)
+
+		newID := make([]byte, len(id)/2)
+		_, err := hex.Decode(newID, []byte(id))
+		if err != nil {
+			panic(err)
+		}
+
+		var newForkID *uint32 = nil
+		if forkID != nil {
+			fidb := make([]byte, 4)
+			_, err := hex.Decode(fidb, []byte(*forkID))
+			if err != nil {
+				panic(err)
+			}
+
+			fid := BytesToUnit32(fidb)
+			newForkID = &fid
+		}
+
+		var newHeadHash *[]byte = nil
+		if headHash != nil {
+			hh := strings.TrimPrefix(*headHash, "0x")
+			nhh := make([]byte, len(hh)/2)
+			_, err := hex.Decode(nhh, []byte(hh))
+			if err != nil {
+				panic(err)
+			}
+
+			newHeadHash = &nhh
+		}
+
+		_, err = stmt.Exec(
+			newID,
+			updatedAt,
+			clientName,
+			rlpxVersion,
+			caps,
+			networkID,
+			newForkID,
+			nextForkID,
+			newHeadHash,
+			ipAddress,
+			connectionType,
+			country,
+			city,
+			latitude,
+			longitude,
+		)
+		if err != nil {
+			return fmt.Errorf("insert exec failed: %w", err)
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("commit tx failed: %w", err)
+	}
+
+	return nil
+}
+
+func (db *DB) Migrate(old *sql.DB) error {
+	var err error
+
+	err = db.migrateDiscoveredNodes(old)
+	if err != nil {
+		return fmt.Errorf("migrate discovered_nodes failed: %w", err)
+	}
+
+	err = db.migrateCrawlHistory(old)
+	if err != nil {
+		return fmt.Errorf("migrate crawl_history failed: %w", err)
+	}
+
+	err = db.migrateBlocks(old)
+	if err != nil {
+		return fmt.Errorf("migrate blocks failed: %w", err)
+	}
+
+	err = db.migrateCrawledNodes(old)
+	if err != nil {
+		return fmt.Errorf("migrate crawled_nodes failed: %w", err)
+	}
+
+	return nil
+}
+
 type tableStats struct {
-	totalDiscoveredNodes int
-	totalCrawledNodes    int
-	totalBlocks          int
-	totalToCrawl         int
-	databaseSizeBytes    int
+	totalDiscoveredNodes int64
+	totalCrawledNodes    int64
+	totalBlocks          int64
+	totalToCrawl         int64
+	databaseSizeBytes    int64
 }
 
 func (db *DB) getTableStats() (*tableStats, error) {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("total_disc_nodes", time.Since(start), err)
+	defer metrics.ObserveDBQuery("total_disc_nodes", start, err)
 
 	rows, err := db.QueryRetryBusy(`
 		SELECT
 			(SELECT COUNT(*) FROM discovered_nodes),
-			(SELECT COUNT(*) FROM discovered_nodes WHERE next_crawl < CURRENT_TIMESTAMP),
+			(SELECT COUNT(*) FROM discovered_nodes WHERE next_crawl < unixepoch()),
 			(SELECT COUNT(*) FROM crawled_nodes),
 			(SELECT COUNT(*) FROM blocks),
 			(

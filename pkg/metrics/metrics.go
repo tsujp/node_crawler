@@ -83,11 +83,11 @@ func boolToStatus(b bool) string {
 	return "error"
 }
 
-func ObserveDBQuery(queryName string, duration time.Duration, err error) {
+func ObserveDBQuery(queryName string, start time.Time, err error) {
 	dbQueryHistogram.With(prometheus.Labels{
 		"query_name": queryName,
 		"status":     boolToStatus(err == nil),
-	}).Observe(duration.Seconds())
+	}).Observe(time.Since(start).Seconds())
 }
 
 func NodeUpdateInc(direction string, err string) {

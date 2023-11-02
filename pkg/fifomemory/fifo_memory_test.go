@@ -7,7 +7,7 @@ import (
 )
 
 func TestFIFOMemory(t *testing.T) {
-	mem := newFifoMemory[int](3)
+	mem := New[int](3)
 
 	if !slices.Equal(mem.memory, []int{}) {
 		t.Errorf("slices not equal: expected: %v, got: %v", []int{}, mem.memory)

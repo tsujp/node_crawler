@@ -77,13 +77,22 @@ var (
 	}
 )
 
-func initDB(dbName string, autovacuum string, busyTimeout uint64) (*sql.DB, error) {
+func initDBReader(dbName string, busyTimeout uint64) (*sql.DB, error) {
+	db, err := openSQLiteDB(dbName, busyTimeout, "", "")
+	if err != nil {
+		return nil, fmt.Errorf("opening database failed: %w", err)
+	}
+
+	return db, nil
+}
+
+func initDBWriter(dbName string, autovacuum string, busyTimeout uint64) (*sql.DB, error) {
 	shouldInit := false
 	if _, err := os.Stat(dbName); os.IsNotExist(err) {
 		shouldInit = true
 	}
 
-	db, err := openSQLiteDB(dbName, autovacuum, busyTimeout)
+	db, err := openSQLiteDB(dbName, busyTimeout, autovacuum, "wal")
 	if err != nil {
 		return nil, fmt.Errorf("opening database failed: %w", err)
 	}
@@ -137,7 +146,7 @@ func readNodeKey(cCtx *cli.Context) (*ecdsa.PrivateKey, error) {
 }
 
 func crawlNodesV2(cCtx *cli.Context) error {
-	sqlite, err := initDB(
+	sqlite, err := initDBWriter(
 		crawlerDBFlag.Get(cCtx)+"_v2",
 		autovacuumFlag.Get(cCtx),
 		busyTimeoutFlag.Get(cCtx),
@@ -229,7 +238,7 @@ func crawlNodes(ctx *cli.Context) error {
 	}
 
 	if ctx.IsSet(crawlerDBFlag.Name) {
-		db, err = initDB(
+		db, err = initDBWriter(
 			ctx.String(crawlerDBFlag.Name),
 			ctx.String(autovacuumFlag.Name),
 			ctx.Uint64(busyTimeoutFlag.Name),

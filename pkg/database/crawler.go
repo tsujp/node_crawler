@@ -2,7 +2,6 @@ package database
 
 import (
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"net"
 	"time"
@@ -42,13 +41,13 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("update_crawled_node_fail", time.Since(start), err)
+	defer metrics.ObserveDBQuery("update_crawled_node_fail", start, err)
 
 	_, err = db.ExecRetryBusy(
 		`
 			INSERT INTO discovered_nodes (
-				id,
-				node,
+				node_id,
+				network_address,
 				ip_address,
 				first_found,
 				last_found,
@@ -57,23 +56,23 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 				?1,
 				?2,
 				?3,
-				CURRENT_TIMESTAMP,
-				CURRENT_TIMESTAMP,
-				datetime(CURRENT_TIMESTAMP, ?6)
+				unixepoch(),
+				unixepoch(),
+				unixepoch() + ?6
 			)
-			ON CONFLICT (id) DO UPDATE
+			ON CONFLICT (node_id) DO UPDATE
 			SET
-				last_found = CURRENT_TIMESTAMP,
+				last_found = unixepoch(),
 				next_crawl = excluded.next_crawl;
 
 			INSERT INTO crawl_history (
-				id,
+				node_id,
 				crawled_at,
 				direction,
 				error
 			) VALUES (
 				?1,
-				CURRENT_TIMESTAMP,
+				unixepoch(),
 				?4,
 				?5
 			);
@@ -96,13 +95,13 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("update_crawled_node_not_eth", time.Since(start), err)
+	defer metrics.ObserveDBQuery("update_crawled_node_not_eth", start, err)
 
 	_, err = db.ExecRetryBusy(
 		`
 			INSERT INTO discovered_nodes (
-				id,
-				node,
+				node_id,
+				network_address,
 				ip_address,
 				first_found,
 				last_found,
@@ -111,13 +110,13 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 				?1,
 				?2,
 				?3,
-				CURRENT_TIMESTAMP,
-				CURRENT_TIMESTAMP,
-				datetime(CURRENT_TIMESTAMP, ?4)
+				unixepoch(),
+				unixepoch(),
+				unixepoch() + ?4
 			)
-			ON CONFLICT (id) DO UPDATE
+			ON CONFLICT (node_id) DO UPDATE
 			SET
-				last_found = CURRENT_TIMESTAMP,
+				last_found = unixepoch(),
 				next_crawl = excluded.next_crawl
 		`,
 		node.ID(),
@@ -136,7 +135,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("update_crawled_node_success", time.Since(start), err)
+	defer metrics.ObserveDBQuery("update_crawled_node_success", start, err)
 
 	info := node.GetInfo()
 	ip := node.N.IP()
@@ -156,7 +155,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 	_, err = db.ExecRetryBusy(
 		`
 			INSERT INTO crawled_nodes (
-				id,
+				node_id,
 				updated_at,
 				client_name,
 				rlpx_version,
@@ -164,82 +163,76 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				network_id,
 				fork_id,
 				next_fork_id,
-				block_height,
 				head_hash,
-				ip,
+				ip_address,
 				connection_type,
 				country,
 				city,
 				latitude,
-				longitude,
-				sequence
+				longitude
 			) VALUES (
-				?1,					-- id
-				CURRENT_TIMESTAMP,	-- last_seen
+				?1,					-- node_id
+				unixepoch(),		-- updated_at
 				nullif(?2, ''),		-- client_name
 				nullif(?3, 0),		-- rlpx_version
 				nullif(?4, ''),		-- capabilities
 				nullif(?5, 0),		-- network_id
-				nullif(?6, ''),		-- fork_id
+				nullif(?6, 0),		-- fork_id
 				nullif(?7, 0),		-- next_fork_id
-				nullif(?8, ''),		-- block_height
-				nullif(?9, ''),		-- head_hash
-				nullif(?10, ''),	-- ip
-				nullif(?11, ''),	-- connection_type
-				nullif(?12, ''),	-- country
-				nullif(?13, ''),	-- city
-				nullif(?14, 0),		-- latitude
-				nullif(?15, 0),		-- longitude
-				nullif(?16, 0)		-- sequence
+				nullif(?8, X''),	-- head_hash
+				nullif(?9, ''),		-- ip_address
+				nullif(?10, ''),	-- connection_type
+				nullif(?11, ''),	-- country
+				nullif(?12, ''),	-- city
+				nullif(?13, 0.0),	-- latitude
+				nullif(?14, 0.0)	-- longitude
 			)
-			ON CONFLICT (id) DO UPDATE
+			ON CONFLICT (node_id) DO UPDATE
 			SET
-				updated_at = CURRENT_TIMESTAMP,
+				updated_at = unixepoch(),
 				client_name = coalesce(excluded.client_name, client_name),
 				rlpx_version = coalesce(excluded.rlpx_version, rlpx_version),
 				capabilities = coalesce(excluded.capabilities, capabilities),
 				network_id = coalesce(excluded.network_id, network_id),
 				fork_id = coalesce(excluded.fork_id, fork_id),
 				next_fork_id = excluded.next_fork_id,			-- Not coalesce because no next fork is valid
-				block_height = coalesce(excluded.block_height, block_height),
 				head_hash = coalesce(excluded.head_hash, head_hash),
-				ip = coalesce(excluded.ip, ip),
+				ip_address = coalesce(excluded.ip_address, ip_address),
 				connection_type = coalesce(excluded.connection_type, connection_type),
 				country = coalesce(excluded.country, country),
 				city = coalesce(excluded.city, city),
 				latitude = coalesce(excluded.latitude, latitude),
-				longitude = coalesce(excluded.longitude, longitude),
-				sequence = coalesce(excluded.sequence, sequence);
+				longitude = coalesce(excluded.longitude, longitude);
 
 			INSERT INTO discovered_nodes (
-				id,
-				node,
+				node_id,
+				network_address,
 				ip_address,
 				first_found,
 				last_found,
 				next_crawl
 			) VALUES (
 				?1,
-				?17,
-				?10,
-				CURRENT_TIMESTAMP,
-				CURRENT_TIMESTAMP,
-				datetime(CURRENT_TIMESTAMP, ?19)
+				?15,
+				?9,
+				unixepoch(),
+				unixepoch(),
+				unixepoch() + ?17
 			)
-			ON CONFLICT (id) DO UPDATE
+			ON CONFLICT (node_id) DO UPDATE
 			SET
-				last_found = CURRENT_TIMESTAMP,
+				last_found = unixepoch(),
 				next_crawl = excluded.next_crawl;
 
 			INSERT INTO crawl_history (
-				id,
+				node_id,
 				crawled_at,
 				direction,
 				error
 			) VALUES (
 				?1,
-				CURRENT_TIMESTAMP,
-				?18,
+				unixepoch(),
+				?16,
 				NULL
 			);
 		`,
@@ -248,17 +241,15 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 		info.RLPxVersion,
 		node.CapsString(),
 		info.NetworkID,
-		hex.EncodeToString(info.ForkID.Hash[:]),
+		BytesToUnit32(info.ForkID.Hash[:]),
 		info.ForkID.Next,
-		info.Blockheight,
-		info.HeadHash.String(),
+		info.HeadHash[:],
 		node.N.IP().String(),
 		node.ConnectionType(),
 		location.country,
 		location.city,
 		location.latitude,
 		location.longitude,
-		node.N.Seq(),
 		node.N.String(),
 		node.Direction,
 		db.nextCrawlSucces,
@@ -271,6 +262,12 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 }
 
 func (db *DB) InsertBlocks(blocks []*types.Header, networkID uint64) error {
+	// tx, err := db.db.Begin()
+	// if err != nil {
+	// 	return fmt.Errorf("starting tx failed: %w", err)
+	// }
+	// defer tx.Rollback()
+
 	stmt, err := db.db.Prepare(`
 		INSERT INTO blocks (
 			block_hash,
@@ -297,19 +294,24 @@ func (db *DB) InsertBlocks(blocks []*types.Header, networkID uint64) error {
 		start := time.Now()
 		_, err = retryBusy(func() (sql.Result, error) {
 			return stmt.Exec(
-				block.Hash().String(),
+				block.Hash().Bytes(),
 				networkID,
-				time.Unix(int64(block.Time), 0).UTC().Format(time.DateTime),
+				block.Time,
 				block.Number.Uint64(),
-				block.ParentHash.String(),
+				block.ParentHash.Bytes(),
 			)
 		})
-		metrics.ObserveDBQuery("insert_block", time.Since(start), err)
+		metrics.ObserveDBQuery("insert_block", start, err)
 
 		if err != nil {
 			log.Error("upsert block failed", "err", err)
 		}
 	}
+
+	// err = tx.Commit()
+	// if err != nil {
+	// 	return fmt.Errorf("commit failed: %w", err)
+	// }
 
 	return nil
 }

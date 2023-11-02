@@ -17,11 +17,15 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/urfave/cli/v2"
+	_ "modernc.org/sqlite/lib"
 )
 
 var (
@@ -43,6 +47,39 @@ func init() {
 	app.Commands = []*cli.Command{
 		apiCommand,
 		crawlerCommand,
+		&cli.Command{
+			Name: "migrate-db",
+			Action: func(ctx *cli.Context) error {
+				oldName := ctx.Args().Get(0)
+				newName := ctx.Args().Get(1)
+
+				fmt.Println(oldName, "=>", newName)
+
+				oldDB, err := sql.Open("sqlite", oldName)
+				if err != nil {
+					return fmt.Errorf("open old db failed: %w", err)
+				}
+
+				newDB, err := sql.Open("sqlite", newName)
+				if err != nil {
+					return fmt.Errorf("open new db failed: %w", err)
+				}
+
+				db := database.NewDB(newDB, nil, time.Second, time.Second, time.Second)
+
+				err = db.CreateTables()
+				if err != nil {
+					return fmt.Errorf("create tables failed: %w", err)
+				}
+
+				err = db.Migrate(oldDB)
+				if err != nil {
+					return fmt.Errorf("migrate failed: %w", err)
+				}
+
+				return nil
+			},
+		},
 	}
 }
 
