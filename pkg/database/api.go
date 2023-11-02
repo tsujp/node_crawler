@@ -588,7 +588,7 @@ type CountTotal struct {
 
 func (t CountTotal) Limit(limit int) CountTotal {
 	return CountTotal{
-		Values: t.Values[:limit],
+		Values: t.Values[:min(limit, len(t.Values))],
 		Total:  t.Total,
 	}
 }
