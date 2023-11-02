@@ -885,7 +885,7 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 	}
 	defer rows.Close()
 
-	allStats := make([]Stats, 1024)
+	allStats := make([]Stats, 0, 1024)
 
 	for rows.Next() {
 		stats := Stats{}
