@@ -147,7 +147,7 @@ func readNodeKey(cCtx *cli.Context) (*ecdsa.PrivateKey, error) {
 
 func crawlNodesV2(cCtx *cli.Context) error {
 	sqlite, err := initDBWriter(
-		crawlerDBFlag.Get(cCtx)+"_v2",
+		crawlerDBFlag.Get(cCtx),
 		autovacuumFlag.Get(cCtx),
 		busyTimeoutFlag.Get(cCtx),
 	)
