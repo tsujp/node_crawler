@@ -9,11 +9,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/node-crawler/pkg/metrics"
 	"golang.org/x/exp/slices"
+	"golang.org/x/mod/semver"
 )
 
 type NodeTableHistory struct {
@@ -116,9 +118,11 @@ func (n NodeTable) HeadHashLine() string {
 	)
 }
 
+var Unknown = "Unknown"
+
 func isSynced(updatedAt *time.Time, headHash *time.Time) string {
 	if updatedAt == nil || headHash == nil {
-		return "Unknown"
+		return Unknown
 	}
 
 	// If head hash is within one minute of the crawl time,
@@ -165,7 +169,7 @@ func (n NodeTable) NextCrawl() string {
 
 func NetworkName(networkID *int64) string {
 	if networkID == nil {
-		return "Unknown"
+		return Unknown
 	}
 
 	switch *networkID {
@@ -178,7 +182,7 @@ func NetworkName(networkID *int64) string {
 	case params.GoerliChainConfig.ChainID.Int64():
 		return "Goerli"
 	default:
-		return "Unknown"
+		return Unknown
 	}
 }
 
@@ -498,65 +502,212 @@ type Stats struct {
 	Synced    string
 }
 
-type AllStats []Stats
+func (s Stats) CountryStr() string {
+	if s.Country == nil {
+		return Unknown
+	}
 
-type StatsFilterFn func(Stats) bool
-
-type Count struct {
-	Key   string
-	Count int
+	return *s.Country
 }
 
-func (s AllStats) CountClientName(filters ...StatsFilterFn) []Count {
-	count := map[string]int{}
+type AllStats []Stats
 
-	for _, stat := range s {
+type KeyFn func(Stats) string
+type StatsFilterFn func(int, Stats) bool
+
+func (s AllStats) Filter(filters ...StatsFilterFn) AllStats {
+	out := make(AllStats, 0, len(s))
+
+	for i, stat := range s {
 		skip := false
 		for _, filter := range filters {
-			if !filter(stat) {
+			if !filter(i, stat) {
 				skip = true
 				break
 			}
 		}
 
-		if skip {
-			continue
+		if !skip {
+			out = append(out, stat)
 		}
+	}
 
-		v, ok := count[stat.Client.Name]
+	return out
+}
+
+func (s AllStats) GroupBy(keyFn KeyFn, filters ...StatsFilterFn) CountTotal {
+	count := map[string]int{}
+
+	for _, stat := range s.Filter(filters...) {
+		key := keyFn(stat)
+
+		v, ok := count[key]
 		if !ok {
 			v = 0
 		}
 
 		v += 1
-		count[stat.Client.Name] = v
+		count[key] = v
 	}
 
 	out := make([]Count, 0, len(count))
+	total := 0
 
 	for key, value := range count {
 		out = append(out, Count{
 			Key:   key,
 			Count: value,
 		})
+
+		total += value
 	}
 
 	slices.SortFunc(out, func(a, b Count) int {
 		if a.Count == b.Count {
-			return strings.Compare(a.Key, b.Key)
+			return strings.Compare(b.Key, a.Key)
 		}
 
-		return a.Count - b.Count
+		return b.Count - a.Count
 	})
 
-	return out
+	return CountTotal{
+		Values: out,
+		Total:  total,
+	}
+}
+
+type Count struct {
+	Key   string
+	Count int
+}
+
+type CountTotal struct {
+	Values []Count
+	Total  int
+}
+
+func (t CountTotal) Limit(limit int) CountTotal {
+	return CountTotal{
+		Values: t.Values[:limit],
+		Total:  t.Total,
+	}
+}
+
+type CountTotalOrderFn func(a, b Count) int
+
+func (t CountTotal) OrderBy(orderByFn CountTotalOrderFn) CountTotal {
+	slices.SortStableFunc(t.Values, orderByFn)
+
+	return CountTotal{
+		Values: t.Values,
+		Total:  t.Total,
+	}
+}
+
+func (s AllStats) CountClientName(filters ...StatsFilterFn) CountTotal {
+	return s.GroupBy(
+		func(s Stats) string {
+			return s.Client.Name
+		},
+		filters...,
+	)
+}
+
+func (s AllStats) GroupCountries(filters ...StatsFilterFn) CountTotal {
+	return s.GroupBy(
+		func(s Stats) string {
+			return s.CountryStr()
+		},
+		filters...,
+	)
+}
+
+func (s AllStats) GroupOS(filters ...StatsFilterFn) CountTotal {
+	return s.GroupBy(
+		func(s Stats) string {
+			return s.Client.OS + " / " + s.Client.Arch
+		},
+		filters...,
+	)
+}
+
+func (s AllStats) GroupArch(filters ...StatsFilterFn) CountTotal {
+	return s.GroupBy(
+		func(s Stats) string {
+			return s.Client.Arch
+		},
+		filters...,
+	)
+}
+
+func (s AllStats) GroupLanguage(filters ...StatsFilterFn) CountTotal {
+	return s.GroupBy(
+		func(s Stats) string {
+			return s.Client.Language
+		},
+		filters...,
+	)
 }
 
 type Client struct {
 	Name     string
 	Version  string
 	OS       string
+	Arch     string
 	Language string
+}
+
+func parseOSArch(osStr string) (string, string) {
+	if osStr == "" {
+		return Unknown, Unknown
+	}
+
+	parts := strings.FieldsFunc(osStr, func(c rune) bool {
+		return c == '-'
+	})
+
+	var os, arch string
+
+	for _, part := range parts {
+		switch part {
+		case "musl", "unknown", "gnu":
+			// NOOP
+		case "linux":
+			os = "Linux"
+		case "freebsd":
+			os = "FreeBSD"
+		case "android":
+			os = "Android"
+		case "windows", "win32":
+			os = "Windows"
+		case "darwin", "osx", "macos", "apple":
+			os = "MacOS"
+		case "amd64", "x64", "x86_64":
+			arch = "amd64"
+		case "arm64", "aarch_64", "aarch64", "arm":
+			arch = "arm64"
+		case "386":
+			arch = "i386"
+		case "s390x":
+			arch = "IBM System/390"
+		default:
+			// NOOP
+		}
+	}
+
+	if os == "" {
+		os = Unknown
+	}
+
+	if arch == "" {
+		arch = Unknown
+	}
+
+	return os, arch
+}
+
+func isVersion(version string) bool {
+	return semver.IsValid(version)
 }
 
 func parseClientName(clientName *string) *Client {
@@ -591,10 +742,12 @@ func parseClientName(clientName *string) *Client {
 			log.Error("nimbus-eth1 not valid", "client_name", name)
 		}
 
+		os, arch := parseOSArch(parts[2])
 		return &Client{
 			Name:     parts[0],
 			Version:  parts[1],
-			OS:       parts[2],
+			OS:       os,
+			Arch:     arch,
 			Language: "nim",
 		}
 	}
@@ -608,20 +761,35 @@ func parseClientName(clientName *string) *Client {
 	switch len(parts) {
 	case 1:
 		return &Client{
-			Name: parts[0],
+			Name:     parts[0],
+			Version:  Unknown,
+			OS:       Unknown,
+			Arch:     Unknown,
+			Language: Unknown,
 		}
 	case 2:
 		return &Client{
-			Name:    parts[0],
-			Version: parts[1],
+			Name:     parts[0],
+			Version:  parts[1],
+			OS:       Unknown,
+			Arch:     Unknown,
+			Language: Unknown,
 		}
 	case 3:
-		lang := ""
+		var os, arch, lang string
 
 		if parts[0] == "reth" {
 			lang = "rust"
+			os, arch = parseOSArch(parts[2])
 		} else if parts[0] == "geth" {
 			lang = "go"
+
+			if isVersion(parts[1]) {
+				os, arch = parseOSArch(parts[2])
+			} else {
+				os, arch = parseOSArch(parts[1])
+				lang = parts[2]
+			}
 		} else {
 			log.Error("not reth or geth", "client_name", name)
 		}
@@ -629,37 +797,58 @@ func parseClientName(clientName *string) *Client {
 		return &Client{
 			Name:     parts[0],
 			Version:  parts[1],
-			OS:       parts[2],
+			OS:       os,
+			Arch:     arch,
 			Language: lang,
 		}
 	case 4:
+		os, arch := parseOSArch(parts[2])
 		return &Client{
 			Name:     parts[0],
 			Version:  parts[1],
-			OS:       parts[2],
+			OS:       os,
+			Arch:     arch,
 			Language: parts[3],
 		}
 	case 5:
+		var version, os, arch, lang string
+
+		// handle geth/v1.2.11-e3acd735-20231031/linux-amd64/go1.20.5/{d+}
+		if strings.TrimFunc(parts[4], unicode.IsDigit) == "" {
+			version = parts[1]
+			os, arch = parseOSArch(parts[2])
+			lang = parts[3]
+		} else {
+			version = parts[2]
+			os, arch = parseOSArch(parts[3])
+			lang = parts[4]
+		}
+
 		return &Client{
 			Name:     parts[0],
-			Version:  parts[2],
-			OS:       parts[3],
-			Language: parts[4],
+			Version:  version,
+			OS:       os,
+			Arch:     arch,
+			Language: lang,
 		}
 	case 6:
 		if parts[0] == "q-client" {
+			os, arch := parseOSArch(parts[4])
 			return &Client{
 				Name:     parts[0],
 				Version:  parts[1],
-				OS:       parts[4],
+				OS:       os,
+				Arch:     arch,
 				Language: parts[5],
 			}
 		}
 	case 7:
+		os, arch := parseOSArch(parts[5])
 		return &Client{
 			Name:     parts[0],
 			Version:  parts[4],
-			OS:       parts[5],
+			OS:       os,
+			Arch:     arch,
 			Language: parts[6],
 		}
 	}

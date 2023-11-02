@@ -294,71 +294,92 @@ css pageButtonInactive() {
 	border: 2px solid #eee;
 }
 
-templ Stats(clients []database.Count, maxValue int, networkID int64, synced int) {
-	<div style="display: flex; flex-direction: column; padding: 1em; gap: 1em;">
-		<div style="display: flex; flex-direction: row; gap: 0.5em;">
+templ NetworkFilterLinks(hrefTemplate string, networkID int64) {
+	<div style="display: flex; flex-direction: row; gap: 0.5em;">
+		<a
+			class={ 
+				pageButton(),
+				templ.KV(pageButtonActive(), -1 == networkID),
+				templ.KV(pageButtonInactive(), -1 != networkID),
+			 }
+			href={ templ.URL(fmt.Sprintf(hrefTemplate, -1)) }
+		>
+			All (-1)
+		</a>
+		for _, netID := range []int64{1, 5, 17000, 11155111} {
 			<a
 				class={ 
 					pageButton(),
-					templ.KV(pageButtonActive(), -1 == networkID),
-					templ.KV(pageButtonInactive(), -1 != networkID),
+					templ.KV(pageButtonActive(), netID == networkID),
+					templ.KV(pageButtonInactive(), netID != networkID),
 				 }
-				href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", -1, synced)) }
+				href={ templ.URL(fmt.Sprintf(hrefTemplate, netID)) }
 			>
-				All (-1)
+				{ database.NetworkName(&netID) } ({ strconv.FormatInt(netID, 10) })
 			</a>
-			for _, netID := range []int64{1, 5, 17000, 11155111} {
-				<a
-					class={ 
-						pageButton(),
-						templ.KV(pageButtonActive(), netID == networkID),
-						templ.KV(pageButtonInactive(), netID != networkID),
-					 }
-					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", netID, synced)) }
-				>
-					{ database.NetworkName(&netID) } ({ strconv.FormatInt(netID, 10) })
-				</a>
+		}
+	</div>
+}
+
+templ SyncedFilterLinks(hrefTemplate string, synced int) {
+	<div style="display: flex; flex-direction: row; gap: 0.5em;">
+			<a
+				class={ 
+					pageButton(),
+					templ.KV(pageButtonActive(), synced == -1),
+					templ.KV(pageButtonInactive(), synced != -1),
+				 }
+				href={ templ.URL(fmt.Sprintf(hrefTemplate, -1)) }
+			>
+				All
+			</a>
+			<a
+				class={ 
+					pageButton(),
+					templ.KV(pageButtonActive(), synced == 1),
+					templ.KV(pageButtonInactive(), synced != 1),
+				 }
+				href={ templ.URL(fmt.Sprintf(hrefTemplate, 1)) }
+			>
+				Synced
+			</a>
+			<a
+				class={ 
+					pageButton(),
+					templ.KV(pageButtonActive(), synced == 0),
+					templ.KV(pageButtonInactive(), synced != 0),
+				 }
+				href={ templ.URL(fmt.Sprintf(hrefTemplate, 0)) }
+			>
+				Not Synced
+			</a>
+	</div>
+}
+
+templ Stats(networkID int64, synced int, stats ...templ.Component) {
+	<div style="display: flex; flex-direction: column; padding: 1em; gap: 1em;">
+		@NetworkFilterLinks(fmt.Sprintf("/?network=%%d&synced=%d", synced), networkID)
+		@SyncedFilterLinks(fmt.Sprintf("/?network=%d&synced=%%d", networkID), synced)
+		
+		<div style="display: flex; flex-direction: row; gap: 1em; flex-wrap: wrap;">
+			for _, stat := range stats {
+				{! stat }
 			}
 		</div>
-		<div style="display: flex; flex-direction: row; gap: 0.5em;">
-				<a
-					class={ 
-						pageButton(),
-						templ.KV(pageButtonActive(), synced == -1),
-						templ.KV(pageButtonInactive(), synced != -1),
-					 }
-					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=-1", networkID)) }
-				>
-					All
-				</a>
-				<a
-					class={ 
-						pageButton(),
-						templ.KV(pageButtonActive(), synced == 1),
-						templ.KV(pageButtonInactive(), synced != 1),
-					 }
-					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=1", networkID)) }
-				>
-					Synced
-				</a>
-				<a
-					class={ 
-						pageButton(),
-						templ.KV(pageButtonActive(), synced == 0),
-						templ.KV(pageButtonInactive(), synced != 0),
-					 }
-					href={ templ.URL(fmt.Sprintf("/?network=%d&synced=0", networkID)) }
-				>
-					Not Synced
-				</a>
+	</div>
+}
+
+templ StatsGroup(name string, stats database.CountTotal) {
+	<div style="display: flex; flex-direction: column; border: 1px solid orange; border-radius: 1em; padding: 1em; flex-grow: 1; min-width: 30%;">
+		<h2>{ name }</h2>
+		<div style="background-color: #333; padding: 0.5em 0; width: 100%;">
+				<span style="padding-inline-start: 0.5em; white-space: nowrap;">Total ({ strconv.Itoa(stats.Total) })</span>
 		</div>
-		<div style="display: flex; flex-direction: column;">
-				for i := len(clients)-1; i >= 0; i-- {
-					<div STYLE_REPLACE={fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", clients[i].Count * 100 / maxValue)}>
-							<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ clients[i].Key } ({ strconv.Itoa(clients[i].Count) })</span>
-					</div>
-				}
-		</div>
+		for _, stat := range stats.Values {
+			<div STYLE_REPLACE={fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", stat.Count * 100 / stats.Total)}>
+					<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ stat.Key } ({ strconv.Itoa(stat.Count) })</span>
+			</div>
+		}
 	</div>
 }
 

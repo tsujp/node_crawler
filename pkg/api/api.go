@@ -262,28 +262,29 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats := a.getStats()
-
-	clientNames := stats.CountClientName(
-		func(s database.Stats) bool {
+	stats := a.getStats().Filter(
+		func(_ int, s database.Stats) bool {
 			return networkID == -1 || (s.NetworkID != nil && *s.NetworkID == networkID)
 		},
-		func(s database.Stats) bool {
+		func(_ int, s database.Stats) bool {
 			return synced == -1 ||
 				(synced == 1 && s.Synced == "Yes") ||
 				(synced == 0 && s.Synced == "No")
 		},
 	)
 
-	maxValue := 0
-	for _, client := range clientNames {
-		maxValue = max(maxValue, client.Count)
-	}
+	statsPage := public.Stats(
+		networkID,
+		synced,
+		public.StatsGroup("Client Names", stats.CountClientName()),
+		public.StatsGroup("Countries", stats.GroupCountries().Limit(20)),
+		public.StatsGroup("OS / Archetectures", stats.GroupOS()),
+		public.StatsGroup("Languages", stats.GroupLanguage()),
+	)
+
+	index := public.Index(statsPage)
 
 	sb := new(strings.Builder)
-
-	statsPage := public.Stats(clientNames, maxValue, networkID, synced)
-	index := public.Index(statsPage)
 	_ = index.Render(r.Context(), sb)
 
 	out := strings.ReplaceAll(sb.String(), "STYLE_REPLACE", "style")
