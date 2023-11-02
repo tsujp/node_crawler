@@ -145,12 +145,6 @@
               description = "Name of the file within the `stateDir` for storing the data for the crawler.";
             };
 
-            apiDatabaseName = mkOption {
-              type = types.str;
-              default = "api.db";
-              description = "Name of the file within the `stateDir` for storing the data for the API.";
-            };
-
             user = mkOption {
               type = types.str;
               default = "nodecrawler";
@@ -331,7 +325,6 @@
                     args = [
                       "--api-addr=${apiAddress}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
-                      "--api-db=${cfg.apiDatabaseName}"
                       "--metrics-addr=${cfg.api.metricsAddress}"
                     ];
                   in
