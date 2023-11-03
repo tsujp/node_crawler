@@ -75,7 +75,8 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 				unixepoch(),
 				?4,
 				?5
-			);
+			)
+			ON CONFLICT (node_id, crawled_at) DO NOTHING;
 		`,
 		node.ID(),
 		node.N.String(),
@@ -234,7 +235,8 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				unixepoch(),
 				?16,
 				NULL
-			);
+			)
+			ON CONFLICT (node_id, crawled_at) DO NOTHING;
 		`,
 		node.ID(),
 		info.ClientName,
