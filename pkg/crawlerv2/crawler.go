@@ -166,7 +166,7 @@ func (c *CrawlerV2) getClientInfo(
 			})
 			_ = conn.Write(crawler.GetBlockHeaders{
 				RequestId: 69420, // Just a random number
-				GetBlockHeadersPacket: &eth.GetBlockHeadersPacket{
+				GetBlockHeadersRequest: &eth.GetBlockHeadersRequest{
 					Origin:  eth.HashOrNumber{Hash: msg.Head},
 					Amount:  10,
 					Skip:    0,
@@ -182,7 +182,7 @@ func (c *CrawlerV2) getClientInfo(
 				RequestId: msg.RequestId,
 			})
 		case *crawler.BlockHeaders:
-			nodeJSON.BlockHeaders = msg.BlockHeadersPacket
+			nodeJSON.BlockHeaders = msg.BlockHeadersRequest
 
 			_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscQuitting})
 
@@ -197,7 +197,6 @@ func (c *CrawlerV2) getClientInfo(
 		// NOOP conditions
 		case *crawler.NewBlockHashes:
 		case *crawler.NewPooledTransactionHashes:
-		case *crawler.NewPooledTransactionHashes66:
 		case *crawler.Transactions:
 
 		default:
