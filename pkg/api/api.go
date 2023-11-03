@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/ethereum/node-crawler/public"
-	"github.com/gorilla/mux"
 )
 
 type API struct {
@@ -86,8 +85,23 @@ func mapPosition(x, y int) string {
 }
 
 func (a *API) nodesHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	nodeID := vars["id"]
+	pathParts := strings.Split(r.URL.Path, "/")
+
+	// /nodes
+	if len(pathParts) == 2 {
+		a.nodesListHandler(w, r)
+
+		return
+	}
+
+	// /nodes/{id}
+	if len(pathParts) != 3 {
+		w.WriteHeader(http.StatusBadRequest)
+
+		return
+	}
+
+	nodeID := pathParts[2]
 
 	nodes, err := a.db.GetNodeTable(r.Context(), nodeID)
 	if err != nil {
@@ -301,12 +315,11 @@ func handleFavicon(w http.ResponseWriter, r *http.Request) {
 func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 	defer wg.Done()
 
-	router := mux.NewRouter().StrictSlash(true)
+	router := http.NewServeMux()
 
 	router.HandleFunc("/", a.handleRoot)
 	router.HandleFunc("/favicon.ico", handleFavicon)
-	router.HandleFunc("/nodes", a.nodesListHandler)
-	router.HandleFunc("/nodes/{id}", a.nodesHandler)
+	router.HandleFunc("/nodes", a.nodesHandler)
 
 	log.Info("Starting API", "address", address)
 	_ = http.ListenAndServe(address, router)
