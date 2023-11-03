@@ -294,12 +294,17 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(out))
 }
 
+func handleFavicon(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write(public.Favicon)
+}
+
 func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 	defer wg.Done()
 
 	router := mux.NewRouter().StrictSlash(true)
 
 	router.HandleFunc("/", a.handleRoot)
+	router.HandleFunc("/favicon.ico", handleFavicon)
 	router.HandleFunc("/nodes", a.nodesListHandler)
 	router.HandleFunc("/nodes/{id}", a.nodesHandler)
 
