@@ -59,7 +59,7 @@ func (a *API) statsUpdaterDaemon() {
 		start := time.Now()
 		nextLoop := start.Truncate(a.statsUpdateFrequency).Add(a.statsUpdateFrequency)
 
-		log.Info("updating stats...")
+		log.Debug("updating stats...")
 
 		stats, err := a.db.GetStats(context.Background())
 		if err != nil {
@@ -71,7 +71,7 @@ func (a *API) statsUpdaterDaemon() {
 
 		a.replaceStats(stats)
 
-		log.Info("stats updated", "next", nextLoop, "took", time.Since(start))
+		log.Debug("stats updated", "next", nextLoop, "took", time.Since(start))
 
 		time.Sleep(time.Until(nextLoop))
 	}
