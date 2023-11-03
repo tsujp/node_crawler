@@ -61,7 +61,7 @@
             src = gitignoreSource ./.;
             subPackages = [ "cmd/crawler" ];
 
-            vendorHash = "sha256-6iq3MrY8I8/+ao/PIKGvrFRY8dzm2/ZD+lE2GxyD08s=";
+            vendorHash = "sha256-MgfbQY6mZcD2uIbuRjB/xDmEy3/iXFsC7028r9j3k8U=";
 
             doCheck = false;
 
