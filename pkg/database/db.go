@@ -49,6 +49,21 @@ func NewDB(
 	}
 }
 
+func (db *DB) AnalyzeDaemon(frequency time.Duration) {
+	for {
+		start := time.Now()
+		nextAnalyze := start.Add(frequency)
+
+		_, err := db.db.Exec("ANALYZE")
+		if err != nil {
+			log.Error("ANALYZE failed", "err", err)
+		}
+		metrics.ObserveDBQuery("analyze", start, err)
+
+		time.Sleep(time.Until(nextAnalyze))
+	}
+}
+
 //go:embed sql/schema.sql
 var schema string
 
@@ -73,7 +88,7 @@ func (db *DB) getTableStats() (*tableStats, error) {
 	var err error
 
 	start := time.Now()
-	defer metrics.ObserveDBQuery("total_disc_nodes", start, err)
+	defer metrics.ObserveDBQuery("table_stats", start, err)
 
 	rows, err := db.QueryRetryBusy(`
 		SELECT

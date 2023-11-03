@@ -39,7 +39,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/crawler"
-	"github.com/ethereum/node-crawler/pkg/crawlerdb"
 	"github.com/ethereum/node-crawler/pkg/crawlerv2"
 	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/ethereum/node-crawler/pkg/disc"
@@ -87,22 +86,9 @@ func initDBReader(dbName string, busyTimeout uint64) (*sql.DB, error) {
 }
 
 func initDBWriter(dbName string, autovacuum string, busyTimeout uint64) (*sql.DB, error) {
-	shouldInit := false
-	if _, err := os.Stat(dbName); os.IsNotExist(err) {
-		shouldInit = true
-	}
-
 	db, err := openSQLiteDB(dbName, busyTimeout, autovacuum, "wal")
 	if err != nil {
 		return nil, fmt.Errorf("opening database failed: %w", err)
-	}
-
-	log.Info("Connected to db")
-	if shouldInit {
-		log.Info("DB did not exist, init")
-		if err := crawlerdb.CreateDB(db); err != nil {
-			return nil, fmt.Errorf("init database failed: %w", err)
-		}
 	}
 
 	return db, nil
@@ -180,6 +166,9 @@ func crawlNodesV2(cCtx *cli.Context) error {
 		return fmt.Errorf("create tables failed: %w", err)
 	}
 
+	go db.AnalyzeDaemon(6 * time.Hour)
+	go db.TableStatsMetricsDaemon(5 * time.Minute)
+
 	nodeKey, err := readNodeKey(cCtx)
 	if err != nil {
 		return fmt.Errorf("node key failed: %w", err)
@@ -210,8 +199,6 @@ func crawlNodesV2(cCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("start crawler v2 failed: %w", err)
 	}
-
-	go db.TableStatsMetricsDaemon(1 * time.Minute)
 
 	// Start metrics server
 	metricsAddr := metricsAddressFlag.Get(cCtx)
