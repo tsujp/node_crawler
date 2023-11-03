@@ -34,6 +34,10 @@ CREATE INDEX IF NOT EXISTS crawled_nodes_node_id_last_seen
 	ON crawled_nodes (node_id, updated_at);
 CREATE INDEX IF NOT EXISTS crawled_nodes_network_id
 	ON crawled_nodes (network_id);
+CREATE INDEX IF NOT EXISTS crawled_nodes_hex_node_id
+	ON crawled_nodes (hex(node_id));
+CREATE INDEX IF NOT EXISTS crawled_nodes_ip_address
+	ON crawled_nodes (ip_address);
 
 CREATE TABLE IF NOT EXISTS crawl_history (
 	node_id		BLOB	NOT NULL,

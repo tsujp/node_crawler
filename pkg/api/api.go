@@ -132,6 +132,7 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	var pageNumber int
 	var networkID int64
 	var synced int
+	var query string
 	var err error
 
 	redirectURL := r.URL
@@ -140,6 +141,7 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	pageNumStr := r.URL.Query().Get("page")
 	networkIDStr := r.URL.Query().Get("network")
 	syncedStr := r.URL.Query().Get("synced")
+	query = r.URL.Query().Get("q")
 
 	if pageNumStr == "" {
 		redirectURL = setQuery(redirectURL, "page", "1")
@@ -198,7 +200,7 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := a.db.GetNodeList(r.Context(), pageNumber, networkID, synced)
+	nodes, err := a.db.GetNodeList(r.Context(), pageNumber, networkID, synced, query)
 	if err != nil {
 		log.Error("get node list failed", "err", err, "pageNumber", pageNumber)
 		w.WriteHeader(http.StatusInternalServerError)

@@ -173,6 +173,8 @@ func NetworkName(networkID *int64) string {
 	}
 
 	switch *networkID {
+	case -1:
+		return "All"
 	case params.MainnetChainConfig.ChainID.Int64():
 		return "Mainnet"
 	case params.HoleskyChainConfig.ChainID.Int64():
@@ -353,6 +355,7 @@ type NodeList struct {
 	Offset        int
 	Total         int
 	NetworkFilter int64
+	Query         string
 	List          []NodeListRow
 
 	Networks []int64
@@ -362,7 +365,13 @@ func (l NodeList) NPages() int {
 	return int(math.Ceil(float64(l.Total) / float64(l.PageSize)))
 }
 
-func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int64, synced int) (*NodeList, error) {
+func (db *DB) GetNodeList(
+	ctx context.Context,
+	pageNumber int,
+	networkID int64,
+	synced int,
+	query string,
+) (*NodeList, error) {
 	var err error
 
 	start := time.Now()
@@ -387,11 +396,11 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int64, 
 				AND crawled.network_id = blocks.network_id
 			)
 			WHERE
-				(
+				(      -- Network ID filter
 					crawled.network_id = ?1
 					OR ?1 = -1
 				)
-				AND (
+				AND (  -- Synced filter
 					?2 = -1  -- All
 					OR (     -- Not synced
 						(
@@ -405,12 +414,18 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int64, 
 						AND ?2 = 1
 					)
 				)
+				AND (  -- Query filter
+					?3 = ''
+					OR ip_address = ?3
+					OR hex(node_id) LIKE upper(?3 || '%')
+				)
 			ORDER BY node_id
-			LIMIT ?3
-			OFFSET ?4
+			LIMIT ?4
+			OFFSET ?5
 		`,
 		networkID,
 		synced,
+		query,
 		pageSize,
 		offset,
 	)
@@ -428,6 +443,7 @@ func (db *DB) GetNodeList(ctx context.Context, pageNumber int, networkID int64, 
 		List:          []NodeListRow{},
 		Networks:      []int64{},
 		NetworkFilter: networkID,
+		Query:         query,
 	}
 
 	for rows.Next() {
