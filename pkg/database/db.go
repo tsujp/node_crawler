@@ -54,10 +54,12 @@ func (db *DB) AnalyzeDaemon(frequency time.Duration) {
 		start := time.Now()
 		nextAnalyze := start.Add(frequency)
 
+		db.wLock.Lock()
 		_, err := db.db.Exec("ANALYZE")
 		if err != nil {
 			log.Error("ANALYZE failed", "err", err)
 		}
+		db.wLock.Unlock()
 		metrics.ObserveDBQuery("analyze", start, err)
 
 		time.Sleep(time.Until(nextAnalyze))
