@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
 	"net"
 	"time"
 
@@ -35,6 +36,10 @@ func (db *DB) IPToLocation(ip net.IP) (location, error) {
 		latitude:  ipRecord.Location.Latitude,
 		longitude: ipRecord.Location.Longitude,
 	}, nil
+}
+
+func randomHourSeconds() int64 {
+	return rand.Int63n(3600)
 }
 
 func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
@@ -83,7 +88,7 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 		node.N.IP().String(),
 		node.Direction,
 		node.Error,
-		db.nextCrawlFail,
+		db.nextCrawlFail+randomHourSeconds(),
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)
@@ -123,7 +128,7 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 		node.ID(),
 		node.N.String(),
 		node.N.IP().String(),
-		db.nextCrawlNotEth,
+		db.nextCrawlNotEth+randomHourSeconds(),
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)
@@ -254,7 +259,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 		location.longitude,
 		node.N.String(),
 		node.Direction,
-		db.nextCrawlSucces,
+		db.nextCrawlSucces+randomHourSeconds(),
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)
