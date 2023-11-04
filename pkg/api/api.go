@@ -119,7 +119,7 @@ func (a *API) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	sb := new(strings.Builder)
 
 	nodeTable := public.NodeTable(*nodes)
-	index := public.Index(nodeTable)
+	index := public.Index(nodeTable, 1, -1)
 	_ = index.Render(r.Context(), sb)
 
 	// This is the worst, but templating the style attribute is
@@ -224,7 +224,7 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nodeList := public.NodeList(*nodes)
-	index := public.Index(nodeList)
+	index := public.Index(nodeList, networkID, synced)
 	_ = index.Render(r.Context(), w)
 }
 
@@ -299,7 +299,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		public.StatsGroup("Languages", stats.GroupLanguage()),
 	)
 
-	index := public.Index(statsPage)
+	index := public.Index(statsPage, networkID, synced)
 
 	sb := new(strings.Builder)
 	_ = index.Render(r.Context(), sb)

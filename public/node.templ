@@ -359,7 +359,7 @@ templ StatsGroup(name string, stats database.CountTotal) {
 	</div>
 }
 
-templ Index(main templ.Component) {
+templ Index(main templ.Component, networkID int64, synced int) {
 	<!DOCTYPE html>
 	<html lang="en-US">
 		<head>
@@ -415,8 +415,8 @@ templ Index(main templ.Component) {
 		<body>
 			<nav>
 				<ul>
-					<li><a href="/">Stats</a></li>
-					<li><a href="/nodes/?network=1&page=1&synced=-1&q=">Nodes</a></li>
+					<li><a href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", networkID, synced)) }>Stats</a></li>
+					<li><a href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", networkID, synced)) }>Nodes</a></li>
 				</ul>
 			</nav>
 			<main>
