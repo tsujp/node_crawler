@@ -122,9 +122,10 @@ func (c *CrawlerV2) getClientInfo(
 	}
 
 	gotStatus := false
+	gotBlocks := 0
+	getBlocks := 1
 
-	loop := true
-	for loop {
+	for {
 		switch msg := conn.Read().(type) {
 		case *crawler.Ping:
 			_ = conn.Write(crawler.Pong{})
@@ -145,9 +146,7 @@ func (c *CrawlerV2) getClientInfo(
 				nodeJSON.EthNode = false
 				_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscUselessPeer})
 
-				loop = false
-
-				break
+				goto loopExit
 			}
 		case *crawler.Status:
 			gotStatus = true
@@ -164,15 +163,36 @@ func (c *CrawlerV2) getClientInfo(
 				Genesis:         msg.Genesis,
 				ForkID:          msg.ForkID,
 			})
+
+			getBlock, err := c.db.GetMissingBlock(msg.NetworkID)
+			if err != nil {
+				log.Error("could not get missing block", "err", err)
+			}
+
+			if getBlock != nil {
+				getBlocks = 2
+
+				_ = conn.Write(crawler.GetBlockHeaders{
+					RequestId: 69419,
+					GetBlockHeadersRequest: &eth.GetBlockHeadersRequest{
+						Origin:  eth.HashOrNumber{Hash: *getBlock},
+						Amount:  1,
+						Skip:    0,
+						Reverse: false,
+					},
+				})
+			}
+
 			_ = conn.Write(crawler.GetBlockHeaders{
-				RequestId: 69420, // Just a random number
+				RequestId: 69420, // Just a random number.
 				GetBlockHeadersRequest: &eth.GetBlockHeadersRequest{
 					Origin:  eth.HashOrNumber{Hash: msg.Head},
-					Amount:  10,
+					Amount:  1,
 					Skip:    0,
-					Reverse: true,
+					Reverse: false,
 				},
 			})
+
 		case *crawler.GetBlockBodies:
 			_ = conn.Write(crawler.BlockBodies{
 				RequestId: msg.RequestId,
@@ -182,17 +202,27 @@ func (c *CrawlerV2) getClientInfo(
 				RequestId: msg.RequestId,
 			})
 		case *crawler.BlockHeaders:
-			nodeJSON.BlockHeaders = msg.BlockHeadersRequest
+			gotBlocks += 1
 
-			_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscQuitting})
+			nodeJSON.BlockHeaders = append(
+				nodeJSON.BlockHeaders,
+				msg.BlockHeadersRequest...,
+			)
 
-			loop = false
+			// Only exit once we have all the number of blocks we asked for.
+			if gotBlocks == getBlocks {
+				_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscQuitting})
+
+				goto loopExit
+			}
 		case *crawler.Disconnect:
 			disconnect = msg
-			loop = false
+
+			goto loopExit
 		case *crawler.Error:
 			readError = msg
-			loop = false
+
+			goto loopExit
 
 		// NOOP conditions
 		case *crawler.NewBlock:
@@ -204,6 +234,8 @@ func (c *CrawlerV2) getClientInfo(
 			log.Info("message type not handled", "type", reflect.TypeOf(msg).String())
 		}
 	}
+
+loopExit:
 
 	_ = conn.Close()
 

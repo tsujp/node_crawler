@@ -2,11 +2,13 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/node-crawler/pkg/common"
@@ -346,4 +348,43 @@ func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
 	}
 
 	return db.UpdateCrawledNodeSuccess(node)
+}
+
+func (db *DB) GetMissingBlock(networkID uint64) (*ethcommon.Hash, error) {
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("get_missing_block", start, err)
+
+	row := db.db.QueryRow(
+		`
+			SELECT
+				crawled.head_hash
+			FROM crawled_nodes AS crawled
+			LEFT JOIN blocks ON (crawled.head_hash = blocks.block_hash)
+			WHERE
+				crawled.network_id = ?1
+				AND blocks.block_hash IS NULL
+			LIMIT 1
+		`,
+		networkID,
+	)
+
+	err = row.Err()
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %w", err)
+	}
+
+	var hash ethcommon.Hash
+
+	err = row.Scan(&hash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("scan failed: %w", err)
+	}
+
+	return &hash, nil
 }
