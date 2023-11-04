@@ -253,7 +253,10 @@ func (n NodeTable) ForkIDStr() string {
 	if n.networkID != nil {
 		forkData, ok := Forks[*n.networkID]
 		if ok {
-			name = forkData.Hash[n.ForkID.Uint32()]
+			forkName, ok := forkData.Hash[n.ForkID.Uint32()]
+			if ok {
+				name = forkName
+			}
 		}
 	}
 
@@ -270,7 +273,10 @@ func (n NodeTable) NextForkIDStr() string {
 	if n.networkID != nil {
 		forkData, ok := Forks[*n.networkID]
 		if ok {
-			name = forkData.BlockTime[*n.NextForkID]
+			forkName, ok := forkData.BlockTime[*n.NextForkID]
+			if ok {
+				name = forkName
+			}
 		}
 	}
 
