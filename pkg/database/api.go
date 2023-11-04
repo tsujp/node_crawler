@@ -13,7 +13,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/node-crawler/pkg/metrics"
@@ -37,6 +38,10 @@ func (fid ForkID) Hex() string {
 	return hex.EncodeToString(fid[:])
 }
 
+func (fid ForkID) String() string {
+	return fid.Hex()
+}
+
 func Uint32ToForkID(i uint32) ForkID {
 	fid := ForkID{}
 	binary.BigEndian.PutUint32(fid[:], i)
@@ -54,10 +59,22 @@ type ForkMaps struct {
 }
 
 var Forks = map[int64]ForkMaps{
-	params.MainnetChainConfig.ChainID.Int64(): createForkMap(params.MainnetGenesisHash, params.MainnetChainConfig),
-	params.GoerliChainConfig.ChainID.Int64():  createForkMap(params.GoerliGenesisHash, params.GoerliChainConfig),
-	params.SepoliaChainConfig.ChainID.Int64(): createForkMap(params.SepoliaGenesisHash, params.SepoliaChainConfig),
-	params.HoleskyChainConfig.ChainID.Int64(): createForkMap(params.HoleskyGenesisHash, params.HoleskyChainConfig),
+	params.MainnetChainConfig.ChainID.Int64(): createForkMap(
+		core.DefaultGenesisBlock().ToBlock(),
+		params.MainnetChainConfig,
+	),
+	params.GoerliChainConfig.ChainID.Int64(): createForkMap(
+		core.DefaultGoerliGenesisBlock().ToBlock(),
+		params.GoerliChainConfig,
+	),
+	params.SepoliaChainConfig.ChainID.Int64(): createForkMap(
+		core.DefaultSepoliaGenesisBlock().ToBlock(),
+		params.SepoliaChainConfig,
+	),
+	params.HoleskyChainConfig.ChainID.Int64(): createForkMap(
+		core.DefaultHoleskyGenesisBlock().ToBlock(),
+		params.HoleskyChainConfig,
+	),
 }
 
 var (
@@ -127,8 +144,8 @@ func uint64prt(i *big.Int) *uint64 {
 	return &ui64
 }
 
-func createForkMap(genesis common.Hash, config *params.ChainConfig) ForkMaps {
-	currentHash := crc32.ChecksumIEEE(params.MainnetGenesisHash.Bytes())
+func createForkMap(genesis *types.Block, config *params.ChainConfig) ForkMaps {
+	currentHash := crc32.ChecksumIEEE(genesis.Hash().Bytes())
 
 	out := ForkMaps{
 		Hash: map[uint32]string{
@@ -137,7 +154,7 @@ func createForkMap(genesis common.Hash, config *params.ChainConfig) ForkMaps {
 		BlockTime: map[uint64]string{},
 	}
 
-	blockTimes := []*uint64{
+	blocks := []*uint64{
 		uint64prt(config.HomesteadBlock),
 		uint64prt(config.DAOForkBlock),
 		uint64prt(config.EIP150Block),
@@ -153,19 +170,42 @@ func createForkMap(genesis common.Hash, config *params.ChainConfig) ForkMaps {
 		uint64prt(config.ArrowGlacierBlock),
 		uint64prt(config.GrayGlacierBlock),
 		uint64prt(config.MergeNetsplitBlock),
+	}
+
+	times := []*uint64{
 		config.ShanghaiTime,
 		config.CancunTime,
 		config.PragueTime,
 		config.VerkleTime,
 	}
 
-	for i, blockTime := range blockTimes {
-		if blockTime != nil {
-			currentHash = checksumUpdate(currentHash, *blockTime)
+	var previousBlock uint64 = 0
+
+	for i, block := range blocks {
+		// Deduplicate blocks in the same fork
+		if block != nil && previousBlock != *block {
+			currentHash = checksumUpdate(currentHash, *block)
 
 			name := ForkNames[i]
 			out.Hash[currentHash] = name
+			out.BlockTime[*block] = name
+
+			previousBlock = *block
+		}
+	}
+
+	var previousBlockTime uint64 = 0
+
+	for i, blockTime := range times {
+		// Deduplicate blocks in the same fork
+		if blockTime != nil && previousBlockTime != *blockTime && *blockTime > genesis.Time() {
+			currentHash = checksumUpdate(currentHash, *blockTime)
+
+			name := ForkNames[i+len(blocks)]
+			out.Hash[currentHash] = name
 			out.BlockTime[*blockTime] = name
+
+			previousBlockTime = *blockTime
 		}
 	}
 
