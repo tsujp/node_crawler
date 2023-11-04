@@ -87,26 +87,27 @@ func mapPosition(x, y int) string {
 func (a *API) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	pathParts := strings.Split(r.URL.Path, "/")
 
-	// /nodes
-	if len(pathParts) == 2 {
-		a.nodesListHandler(w, r)
-
-		return
-	}
-
 	// /nodes/{id}
 	if len(pathParts) != 3 {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusNotFound)
 
 		return
 	}
 
 	nodeID := pathParts[2]
 
+	// /nodes/
+	if nodeID == "" {
+		a.nodesListHandler(w, r)
+
+		return
+	}
+
 	nodes, err := a.db.GetNodeTable(r.Context(), nodeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			w.WriteHeader(http.StatusNotFound)
+
 			return
 		}
 		log.Error("get node page failed", "err", err, "id", nodeID)
@@ -319,7 +320,7 @@ func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 
 	router.HandleFunc("/", a.handleRoot)
 	router.HandleFunc("/favicon.ico", handleFavicon)
-	router.HandleFunc("/nodes", a.nodesHandler)
+	router.HandleFunc("/nodes/", a.nodesHandler)
 
 	log.Info("Starting API", "address", address)
 	_ = http.ListenAndServe(address, router)

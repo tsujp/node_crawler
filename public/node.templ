@@ -3,7 +3,6 @@ package public
 import "github.com/ethereum/node-crawler/pkg/database"
 import "strconv"
 import "fmt"
-import "encoding/hex"
 
 templ NodeTable(nt database.NodeTable) {
 	<div style="margin: 1em;">
@@ -40,15 +39,11 @@ templ NodeTable(nt database.NodeTable) {
 				</tr>
 				<tr>
 					<td>Fork ID</td>
-					<td>{ hex.EncodeToString(nt.ForkID[:]) }</td>
+					<td>{ nt.ForkIDStr() }</td>
 				</tr>
 				<tr>
 					<td>Next Fork ID</td>
-					if nt.NextForkID != nil {
-						<td>{ strconv.FormatUint(*nt.NextForkID, 10) }</td>
-					} else {
-						<td></td>
-					}
+					<td>{ nt.NextForkIDStr() }</td>
 				</tr>
 				<tr>
 					<td>Head Hash</td>
@@ -117,11 +112,11 @@ templ NodeList(nodes database.NodeList) {
 	<div class={ nodeListClass() }>
 		<div style="width: 100%; display: flex; flex-direction: column; row-gap: 0.5em;">
 			<h3>Nodes</h3>
-			@NetworkFilterLinks(fmt.Sprintf("/nodes?network=%%d&page=%d&synced=%d&q=%s", nodes.PageNumber, nodes.Synced, nodes.Query), nodes.NetworkFilter)
-			@SyncedFilterLinks(fmt.Sprintf("/nodes?network=%d&page=%d&synced=%%d&q=%s", nodes.NetworkFilter, nodes.PageNumber, nodes.Query), nodes.Synced)
+			@NetworkFilterLinks(fmt.Sprintf("/nodes/?network=%%d&page=%d&synced=%d&q=%s", nodes.PageNumber, nodes.Synced, nodes.Query), nodes.NetworkFilter)
+			@SyncedFilterLinks(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%%d&q=%s", nodes.NetworkFilter, nodes.PageNumber, nodes.Query), nodes.Synced)
 			<div style="display:none">
 				for _, networkID := range nodes.Networks {
-					<a href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&q=%s", networkID, nodes.PageNumber, nodes.Query)) }>
+					<a href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&q=%s", networkID, nodes.PageNumber, nodes.Query)) }>
 						{ database.NetworkName(&networkID) }
 					</a>
 				}
@@ -248,7 +243,7 @@ templ spacer() {
 
 templ pageNumberButton(networkID int64, pageNumber int, isPage bool, synced int, query string) {
 	<a
- 		href={ templ.URL(fmt.Sprintf("/nodes?network=%d&page=%d&synced=%d&q=%s", networkID, pageNumber, synced, query)) }
+ 		href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", networkID, pageNumber, synced, query)) }
  		class={ 
 			pageButton(),
 			templ.KV(pageButtonActive(), isPage),
@@ -421,7 +416,7 @@ templ Index(main templ.Component) {
 			<nav>
 				<ul>
 					<li><a href="/">Stats</a></li>
-					<li><a href="/nodes?network=1&page=1&synced=-1&q=">Nodes</a></li>
+					<li><a href="/nodes/?network=1&page=1&synced=-1&q=">Nodes</a></li>
 				</ul>
 			</nav>
 			<main>

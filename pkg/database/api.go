@@ -5,12 +5,15 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"hash/crc32"
 	"math"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/node-crawler/pkg/metrics"
@@ -26,6 +29,14 @@ type NodeTableHistory struct {
 
 type ForkID [4]byte
 
+func (fid ForkID) Uint32() uint32 {
+	return binary.BigEndian.Uint32(fid[:])
+}
+
+func (fid ForkID) Hex() string {
+	return hex.EncodeToString(fid[:])
+}
+
 func Uint32ToForkID(i uint32) ForkID {
 	fid := ForkID{}
 	binary.BigEndian.PutUint32(fid[:], i)
@@ -35,6 +46,130 @@ func Uint32ToForkID(i uint32) ForkID {
 
 func BytesToUnit32(b []byte) uint32 {
 	return binary.BigEndian.Uint32(b)
+}
+
+type ForkMaps struct {
+	Hash      map[uint32]string
+	BlockTime map[uint64]string
+}
+
+var Forks = map[int64]ForkMaps{
+	params.MainnetChainConfig.ChainID.Int64(): createForkMap(params.MainnetGenesisHash, params.MainnetChainConfig),
+	params.GoerliChainConfig.ChainID.Int64():  createForkMap(params.GoerliGenesisHash, params.GoerliChainConfig),
+	params.SepoliaChainConfig.ChainID.Int64(): createForkMap(params.SepoliaGenesisHash, params.SepoliaChainConfig),
+	params.HoleskyChainConfig.ChainID.Int64(): createForkMap(params.HoleskyGenesisHash, params.HoleskyChainConfig),
+}
+
+var (
+	ForkNameHomeStead      = "Homestead"
+	ForkNameDAO            = "DAO Fork"
+	ForkNameEIP150         = "Tangerine Whistle (EIP 150)"
+	ForkNameEIP155         = "Spurious Dragon/1 (EIP 155)"
+	ForkNameEIP158         = "Spurious Dragon/2 (EIP 158)"
+	ForkNameByzantium      = "Byzantium"
+	ForkNameConstantinople = "Constantinople"
+	ForkNamePetersburg     = "Petersburg"
+	ForkNameIstanbul       = "Istanbul"
+	ForkNameMuirGlacier    = "Muir Glacier"
+	ForkNameBerlin         = "Berlin"
+	ForkNameLondon         = "London"
+	ForkNameArrowGlacier   = "Arrow Glacier"
+	ForkNameGrayGlacier    = "Gray Glacier"
+	ForkNameMerge          = "Merge"
+	ForkNameShanghai       = "Shanghai"
+	ForkNameCancun         = "Cancun"
+	ForkNamePrague         = "Prague"
+	ForkNameVerkle         = "Verkle"
+)
+
+var ForkNames = []string{
+	ForkNameHomeStead,
+	ForkNameDAO,
+	ForkNameEIP150,
+	ForkNameEIP155,
+	ForkNameEIP158,
+	ForkNameByzantium,
+	ForkNameConstantinople,
+	ForkNamePetersburg,
+	ForkNameIstanbul,
+	ForkNameMuirGlacier,
+	ForkNameBerlin,
+	ForkNameLondon,
+	ForkNameArrowGlacier,
+	ForkNameGrayGlacier,
+	ForkNameMerge,
+	ForkNameShanghai,
+	ForkNameCancun,
+	ForkNamePrague,
+	ForkNameVerkle,
+}
+
+var Chains = map[int64]*params.ChainConfig{
+	params.MainnetChainConfig.ChainID.Int64(): params.MainnetChainConfig,
+	params.GoerliChainConfig.ChainID.Int64():  params.GoerliChainConfig,
+	params.SepoliaChainConfig.ChainID.Int64(): params.SepoliaChainConfig,
+	params.HoleskyChainConfig.ChainID.Int64(): params.HoleskyChainConfig,
+}
+
+func checksumUpdate(hash uint32, fork uint64) uint32 {
+	var blob [8]byte
+	binary.BigEndian.PutUint64(blob[:], fork)
+
+	return crc32.Update(hash, crc32.IEEETable, blob[:])
+}
+
+func uint64prt(i *big.Int) *uint64 {
+	if i == nil {
+		return nil
+	}
+
+	ui64 := i.Uint64()
+	return &ui64
+}
+
+func createForkMap(genesis common.Hash, config *params.ChainConfig) ForkMaps {
+	currentHash := crc32.ChecksumIEEE(params.MainnetGenesisHash.Bytes())
+
+	out := ForkMaps{
+		Hash: map[uint32]string{
+			currentHash: "Genesis",
+		},
+		BlockTime: map[uint64]string{},
+	}
+
+	blockTimes := []*uint64{
+		uint64prt(config.HomesteadBlock),
+		uint64prt(config.DAOForkBlock),
+		uint64prt(config.EIP150Block),
+		uint64prt(config.EIP155Block),
+		uint64prt(config.EIP158Block),
+		uint64prt(config.ByzantiumBlock),
+		uint64prt(config.ConstantinopleBlock),
+		uint64prt(config.PetersburgBlock),
+		uint64prt(config.IstanbulBlock),
+		uint64prt(config.MuirGlacierBlock),
+		uint64prt(config.BerlinBlock),
+		uint64prt(config.LondonBlock),
+		uint64prt(config.ArrowGlacierBlock),
+		uint64prt(config.GrayGlacierBlock),
+		uint64prt(config.MergeNetsplitBlock),
+		config.ShanghaiTime,
+		config.CancunTime,
+		config.PragueTime,
+		config.VerkleTime,
+	}
+
+	for i, blockTime := range blockTimes {
+		if blockTime != nil {
+			currentHash = checksumUpdate(currentHash, *blockTime)
+
+			name := ForkNames[i]
+			out.Hash[currentHash] = name
+			out.BlockTime[*blockTime] = name
+		}
+	}
+
+	return out
 }
 
 type NodeTable struct {
@@ -66,6 +201,70 @@ func (n NodeTable) RLPXVersion() string {
 	}
 
 	return strconv.FormatInt(*n.RlpxVersion, 10)
+}
+
+func (n NodeTable) ForkIDStr() string {
+	if n.ForkID == nil {
+		return ""
+	}
+
+	name := Unknown
+
+	if n.networkID != nil {
+		forkData, ok := Forks[*n.networkID]
+		if ok {
+			name = forkData.Hash[n.ForkID.Uint32()]
+		}
+	}
+
+	return fmt.Sprintf("%s (%s)", name, n.ForkID.Hex())
+}
+
+func (n NodeTable) NextForkIDStr() string {
+	if n.NextForkID == nil {
+		return ""
+	}
+
+	name := Unknown
+
+	if n.networkID != nil {
+		forkData, ok := Forks[*n.networkID]
+		if ok {
+			name = forkData.BlockTime[*n.NextForkID]
+		}
+	}
+
+	return fmt.Sprintf("%s (%d)", name, *n.NextForkID)
+}
+
+func isReadyForCancun(networkID *int64, forkID *uint32, nextForkID *uint64) int {
+	if networkID == nil || nextForkID == nil {
+		return -1
+	}
+
+	chain, ok := Chains[*networkID]
+	if !ok {
+		return -1
+	}
+
+	if nextForkID == chain.CancunTime {
+		return 1
+	}
+
+	if forkID == nil {
+		return -1
+	}
+
+	forks, ok := Forks[*networkID]
+	if !ok {
+		return -1
+	}
+
+	if forks.Hash[*forkID] == "Cancun" {
+		return 1
+	}
+
+	return 0
 }
 
 func StringOrEmpty(v *string) string {
