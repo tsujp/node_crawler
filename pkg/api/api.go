@@ -309,6 +309,121 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(out))
 }
 
+func (a *API) handleHistoryList(w http.ResponseWriter, r *http.Request) {
+	var networkID int64
+	var isError int
+	var before, after *time.Time
+
+	var err error
+
+	redirectURL := r.URL
+	redirect := false
+
+	query := r.URL.Query()
+	networkIDStr := query.Get("network")
+	isErrorStr := query.Get("error")
+	beforeStr := query.Get("before")
+	afterStr := query.Get("after")
+
+	if networkIDStr == "" {
+		redirectURL = setQuery(redirectURL, "network", "1")
+		redirect = true
+	} else {
+		networkID, err = strconv.ParseInt(networkIDStr, 10, 64)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
+
+			return
+		}
+	}
+
+	if isErrorStr == "" {
+		redirectURL = setQuery(redirectURL, "error", "-1")
+		redirect = true
+	} else {
+		isError, err = strconv.Atoi(isErrorStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad error value: %s\n", networkIDStr)
+
+			return
+		}
+
+		if isError != -1 && isError != 0 && isError != 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(w, "bad error value: %s. Must be one of -1, 0, 1\n", isErrorStr)
+
+			return
+		}
+	}
+
+	if beforeStr != "" {
+		beforeT, err := time.ParseInLocation(database.DateTimeLocal, beforeStr, time.UTC)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(
+				w,
+				"bad before value: %s. Must be YYYY-MM-DDThh:mm:ss format. It will be interpreted in UTC.\n",
+				beforeStr,
+			)
+
+			return
+		}
+
+		before = &beforeT
+	}
+
+	if afterStr != "" {
+		afterT, err := time.ParseInLocation(database.DateTimeLocal, afterStr, time.UTC)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = fmt.Fprintf(
+				w,
+				"bad after value: %s. Must be YYYY-MM-DDThh:mm:ss format. It will be interpreted in UTC.\n",
+				afterStr,
+			)
+
+			return
+		}
+
+		after = &afterT
+	}
+
+	if beforeStr == "" && afterStr == "" {
+		redirectURL = setQuery(redirectURL, "after", time.Now().UTC().Format(database.DateTimeLocal))
+		redirect = true
+	}
+
+	if redirect {
+		w.Header().Add("Location", redirectURL.String())
+		w.WriteHeader(http.StatusTemporaryRedirect)
+
+		return
+	}
+
+	historyList, err := a.db.GetHistoryList(r.Context(), before, after, networkID, isError)
+	if err != nil {
+		log.Error("get history list failed", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	index := public.Index(
+		public.HistoryList(*historyList),
+		networkID,
+		1,
+	)
+
+	sb := new(strings.Builder)
+	_ = index.Render(r.Context(), sb)
+
+	out := strings.ReplaceAll(sb.String(), "STYLE_REPLACE", "style")
+
+	_, _ = w.Write([]byte(out))
+}
+
 func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(public.Favicon)
 }
@@ -320,6 +435,7 @@ func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 
 	router.HandleFunc("/", a.handleRoot)
 	router.HandleFunc("/favicon.ico", handleFavicon)
+	router.HandleFunc("/history/", a.handleHistoryList)
 	router.HandleFunc("/nodes/", a.nodesHandler)
 
 	log.Info("Starting API", "address", address)

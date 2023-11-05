@@ -168,6 +168,126 @@ templ NodeList(nodes database.NodeList) {
 	</div>
 }
 
+templ HistoryList(history database.HistoryList) {
+	<div class={ nodeListClass() }>
+		<div style="width: 100%; display: flex; flex-direction: column; row-gap: 0.5em;">
+			<h3>History</h3>
+			@NetworkFilterLinks(
+				fmt.Sprintf(
+					"/history/?network=%%d&before=%s&after=%s&error=%d",
+					history.BeforeStr(),
+					history.AfterStr(),
+					history.IsError,
+				),
+				history.NetworkID,
+			)
+			<div style="display: flex; flex-direction: row; gap: 0.5em;">
+					<a
+						class={
+							pageButton(),
+							templ.KV(pageButtonActive(), history.IsError == -1),
+							templ.KV(pageButtonInactive(), history.IsError != -1),
+						}
+						href={
+							templ.URL(fmt.Sprintf(
+								"/history/?network=%d&before=%s&after=%s&error=-1",
+								history.NetworkID,
+								history.BeforeStr(),
+								history.AfterStr(),
+							))
+						}
+					>
+						All
+					</a>
+					<a
+						class={
+							pageButton(),
+							templ.KV(pageButtonActive(), history.IsError == 1),
+							templ.KV(pageButtonInactive(), history.IsError != 1),
+						}
+						href={
+							templ.URL(fmt.Sprintf(
+								"/history/?network=%d&before=%s&after=%s&error=1",
+								history.NetworkID,
+								history.BeforeStr(),
+								history.AfterStr(),
+							))
+						}
+					>
+						Error
+					</a>
+					<a
+						class={
+							pageButton(),
+							templ.KV(pageButtonActive(), history.IsError == 0),
+							templ.KV(pageButtonInactive(), history.IsError != 0),
+						}
+						href={
+							templ.URL(fmt.Sprintf(
+								"/history/?network=%d&before=%s&after=%s&error=0",
+								history.NetworkID,
+								history.BeforeStr(),
+								history.AfterStr(),
+							))
+						}
+					>
+						Success
+					</a>
+			</div>
+			<form action="/history/" method="get">
+				<input name="network" type="hidden" value={ strconv.FormatInt(history.NetworkID, 10) } />
+
+				<input class={ pageButton(), pageButtonActive() } name="after" type="datetime-local" step="1" value={ history.FirstTimeStr() } /> UTC
+				<input class={ pageButton(), pageButtonActive() } title="Activate the flux capacitor" type="submit" value="Go to time" />
+			</form>
+
+			<table style="width:100%">
+				<thead>
+					<tr>
+						<td>Node ID</td>
+						<td>Client Name</td>
+						<td>Network ID</td>
+						<td>Crawled At</td>
+						<td>Direction</td>
+						<td>Error</td>
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range history.Rows {
+						<tr>
+							<td><a href={ templ.URL("/nodes/" + row.NodeID) }>{ row.NodeID[:8] }</a></td>
+							<td>{ database.StringOrEmpty(row.ClientName) }</td>
+							<td>{ row.NetworkIDStr() }</td>
+							<td title={ row.CrawledAt.UTC().Format(database.DateFormat) }>{ row.SinceCrawled() }</td>
+							<td>{ row.Direction }</td>
+							<td>{ database.StringOrEmpty(row.Error) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<div style="display:flex;flex-direction:row;justify-content:space-between;align-items:center;gap:2em">
+				<div></div>
+				<div style="display:flex;flex-direction:row;align-items:center">
+					if history.FirstTime != nil && history.LastTime != nil {
+						<a
+							class={ pageButton(), pageButtonActive() }
+							href={templ.URL(fmt.Sprintf("/history/?network=%d&before=%s", history.NetworkID, history.FirstTimeStr()))}
+						>
+							Previous
+						</a>
+						<a
+							class={ pageButton(), pageButtonActive() }
+							href={templ.URL(fmt.Sprintf("/history/?network=%d&after=%s", history.NetworkID, history.LastTimeStr()))}
+						>
+							Next
+						</a>
+					}
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
 templ nodesCount(nodes database.NodeList) {
 	if nodes.Total == 1 {
 		<span>1 Node</span>
@@ -417,6 +537,7 @@ templ Index(main templ.Component, networkID int64, synced int) {
 				<ul>
 					<li><a href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", networkID, synced)) }>Stats</a></li>
 					<li><a href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", networkID, synced)) }>Nodes</a></li>
+					<li><a href={ templ.URL(fmt.Sprintf("/history/?network=%d", networkID)) }>Crawl History</a></li>
 				</ul>
 			</nav>
 			<main>

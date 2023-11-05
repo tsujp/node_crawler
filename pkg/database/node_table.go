@@ -124,6 +124,14 @@ func StringOrEmpty(v *string) string {
 	return *v
 }
 
+func IntOrEmpty[T int | int64](v *T) string {
+	if v == nil {
+		return ""
+	}
+
+	return strconv.FormatInt(int64(*v), 10)
+}
+
 func (n NodeTable) NodeID() string {
 	return hex.EncodeToString(n.nodeID)
 }

@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS crawl_history (
 	PRIMARY KEY (node_id, crawled_at)
 ) STRICT;
 
+CREATE INDEX IF NOT EXISTS crawl_history_crawled_at
+	ON crawl_history (crawled_at);
+
 CREATE TABLE IF NOT EXISTS blocks (
 	block_hash		BLOB	NOT NULL,
 	network_id		INTEGER NOT NULL,
