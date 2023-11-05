@@ -48,10 +48,8 @@ CREATE TABLE IF NOT EXISTS crawl_history (
 	PRIMARY KEY (node_id, crawled_at)
 ) STRICT;
 
-CREATE INDEX IF NOT EXISTS crawl_history_crawled_at_error
-	ON crawl_history (crawled_at) WHERE error IS NULL;
-CREATE INDEX IF NOT EXISTS crawl_history_crawled_at_success
-	ON crawl_history (crawled_at) WHERE error IS NOT NULL;
+CREATE INDEX IF NOT EXISTS crawl_history_crawled_at
+	ON crawl_history (crawled_at);
 
 CREATE TABLE IF NOT EXISTS blocks (
 	block_hash		BLOB	NOT NULL,

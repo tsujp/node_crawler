@@ -438,9 +438,16 @@ func (db *DB) GetHistoryList(
 	start := time.Now()
 	defer metrics.ObserveDBQuery("get_history_list", start, err)
 
+	queryOrderDirection := "ASC"
+	if before == nil {
+		queryOrderDirection = "DESC"
+	}
+
 	rows, err := db.db.QueryContext(
 		ctx,
-		`
+		// Don't ever do this, but we have no other choice because I could not
+		// find another way to conditionally set the order direction. :(
+		fmt.Sprintf(`
 			SELECT
 				history.node_id,
 				crawled.client_name,
@@ -474,13 +481,9 @@ func (db *DB) GetHistoryList(
 						AND history.error IS NOT NULL
 					)
 				)
-			ORDER BY
-				CASE WHEN ?1 IS NULL
-					THEN -history.crawled_at
-					ELSE history.crawled_at -- DESC
-				END
+			ORDER BY history.crawled_at %s
 			LIMIT 50
-		`,
+		`, queryOrderDirection),
 		timePtrToUnixPtr(before),
 		timePtrToUnixPtr(after),
 		networkID,
