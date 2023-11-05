@@ -211,7 +211,7 @@ func (c *CrawlerV2) getClientInfo(
 
 			// Only exit once we have all the number of blocks we asked for.
 			if gotBlocks == getBlocks {
-				_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscQuitting})
+				_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscTooManyPeers})
 
 				goto loopExit
 			}
