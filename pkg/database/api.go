@@ -107,6 +107,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 			FROM crawl_history
 			WHERE
 				node_id = ?
+			ORDER BY crawled_at DESC
 			LIMIT 10
 		`,
 		nodeIDBytes,

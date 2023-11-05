@@ -84,6 +84,7 @@ templ NodeTable(nt database.NodeTable) {
 			<thead>
 				<tr>
 					<td>Timestamp</td>
+					<td>Since</td>
 					<td>Direction</td>
 					<td>Error</td>
 				</tr>
@@ -92,6 +93,7 @@ templ NodeTable(nt database.NodeTable) {
 				for _, row := range nt.History {
 					<tr>
 						<td>{ row.CrawledAt.UTC().Format(database.DateFormat) }</td>
+						<td>{ row.CrawledAtLine() }</td>
 						<td>{ row.Direction }</td>
 						<td>{ row.Error }</td>
 					</tr>

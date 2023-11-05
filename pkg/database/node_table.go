@@ -15,6 +15,10 @@ type NodeTableHistory struct {
 	Error     string
 }
 
+func (h NodeTableHistory) CrawledAtLine() string {
+	return sinceUpdate(&h.CrawledAt)
+}
+
 type NodeTable struct {
 	nodeID         []byte
 	updatedAt      *time.Time
@@ -146,7 +150,7 @@ func (n NodeTable) NetworkID() string {
 
 func (n NodeTable) YOffsetPercent() int {
 	if n.Latitude == nil {
-		return 0
+		return 50
 	}
 
 	return 100 - int((*n.Latitude+90)/180*100)
@@ -154,7 +158,7 @@ func (n NodeTable) YOffsetPercent() int {
 
 func (n NodeTable) XOffsetPercent() int {
 	if n.Longitude == nil {
-		return 0
+		return 50
 	}
 
 	return int((*n.Longitude + 180) / 360 * 100)
@@ -163,6 +167,10 @@ func (n NodeTable) XOffsetPercent() int {
 var DateFormat = "2006-01-02 15:04:05 MST"
 
 func (n NodeTable) HeadHashLine() string {
+	if n.HeadHash == nil {
+		return ""
+	}
+
 	if n.HeadHashTime == nil {
 		return hex.EncodeToString(*n.HeadHash)
 	}
@@ -208,6 +216,10 @@ func sinceUpdate(updatedAt *time.Time) string {
 }
 
 func (n NodeTable) UpdatedAt() string {
+	if n.updatedAt == nil {
+		return ""
+	}
+
 	return fmt.Sprintf(
 		"%s (%s)",
 		sinceUpdate(n.updatedAt),
