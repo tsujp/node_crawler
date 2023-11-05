@@ -63,4 +63,3 @@ CREATE TABLE IF NOT EXISTS blocks (
 
 CREATE INDEX IF NOT EXISTS blocks_block_hash_timestamp
 	ON blocks (block_hash, timestamp);
-
