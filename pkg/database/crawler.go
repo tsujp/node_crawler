@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"sync"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -350,13 +351,27 @@ func (db *DB) UpsertCrawledNode(node common.NodeJSON) error {
 	return db.UpdateCrawledNodeSuccess(node)
 }
 
+var missingBlockCache = map[uint64][]ethcommon.Hash{}
+var missingBlocksLock = sync.Mutex{}
+
 func (db *DB) GetMissingBlock(networkID uint64) (*ethcommon.Hash, error) {
 	var err error
+
+	missingBlocksLock.Lock()
+	defer missingBlocksLock.Unlock()
+
+	blocks, ok := missingBlockCache[networkID]
+	if ok && len(blocks) != 0 {
+		block := blocks[0]
+		missingBlockCache[networkID] = blocks[1:]
+
+		return &block, nil
+	}
 
 	start := time.Now()
 	defer metrics.ObserveDBQuery("get_missing_block", start, err)
 
-	row := db.db.QueryRow(
+	rows, err := db.db.Query(
 		`
 			SELECT
 				crawled.head_hash
@@ -365,26 +380,37 @@ func (db *DB) GetMissingBlock(networkID uint64) (*ethcommon.Hash, error) {
 			WHERE
 				crawled.network_id = ?1
 				AND blocks.block_hash IS NULL
-			LIMIT 1
+			LIMIT 1000
 		`,
 		networkID,
 	)
-
-	err = row.Err()
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
 
-	var hash ethcommon.Hash
+	newBlocks := make([]ethcommon.Hash, 0, 1000)
 
-	err = row.Scan(&hash)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+	for rows.Next() {
+		var hash ethcommon.Hash
+
+		err = rows.Scan(&hash)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, nil
+			}
+
+			return nil, fmt.Errorf("scan failed: %w", err)
 		}
 
-		return nil, fmt.Errorf("scan failed: %w", err)
+		newBlocks = append(newBlocks, hash)
 	}
 
-	return &hash, nil
+	if len(newBlocks) == 0 {
+		return nil, nil
+	}
+
+	block := newBlocks[0]
+	missingBlockCache[networkID] = newBlocks[1:]
+
+	return &block, nil
 }
