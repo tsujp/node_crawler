@@ -234,12 +234,27 @@ templ HistoryList(history database.HistoryList) {
 						Success
 					</a>
 			</div>
-			<form action="/history/" method="get">
-				<input name="network" type="hidden" value={ strconv.FormatInt(history.NetworkID, 10) } />
+			<div style="display: flex; gap: 0.5em; align-items: center;">
+				<form style="display: flex; align-items: center; gap: 0.5em;" action="/history/" method="get">
+					<input name="network" type="hidden" value={ strconv.FormatInt(history.NetworkID, 10) } />
 
-				<input class={ pageButton(), pageButtonActive() } name="after" type="datetime-local" step="1" value={ history.FirstTimeStr() } /> UTC
-				<input class={ pageButton(), pageButtonActive() } title="Activate the flux capacitor" type="submit" value="Go to time" />
-			</form>
+					<input class={ pageButton(), pageButtonActive() } name="after" type="datetime-local" step="1" value={ history.FirstTimeStr() } /> UTC
+					<input class={ pageButton(), pageButtonActive() } title="Activate the flux capacitor" type="submit" value="Go to time" />
+				</form>
+				<a
+					class={ pageButton(), pageButtonActive() }
+					href={
+						templ.URL(fmt.Sprintf(
+							"/history/?network=%d&error=%d",
+							history.NetworkID,
+							history.IsError,
+						))
+					}
+					title="We have to go back"
+				>
+					Go to now
+				</a>
+			</div>
 
 			<table style="width:100%">
 				<thead>
@@ -529,6 +544,9 @@ templ Index(main templ.Component, networkID int64, synced int) {
 				}
 				nav li a:hover {
 					background-color: #111;
+				}
+				input {
+					font-size: inherit;
 				}
 			</style>
 		</head>
