@@ -296,7 +296,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		public.StatsGroup("Client Names", stats.CountClientName()),
 		public.StatsGroup("Countries", stats.GroupCountries().Limit(20)),
 		public.StatsGroup("OS / Archetectures", stats.GroupOS()),
-		public.StatsGroup("Languages", stats.GroupLanguage()),
+		// public.StatsGroup("Languages", stats.GroupLanguage()),
 	)
 
 	index := public.Index(statsPage, networkID, synced)
