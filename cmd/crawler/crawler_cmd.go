@@ -166,7 +166,7 @@ func crawlNodesV2(cCtx *cli.Context) error {
 		return fmt.Errorf("create tables failed: %w", err)
 	}
 
-	go db.AnalyzeDaemon(6 * time.Hour)
+	// go db.AnalyzeDaemon(6 * time.Hour)
 	go db.TableStatsMetricsDaemon(5 * time.Minute)
 
 	nodeKey, err := readNodeKey(cCtx)
