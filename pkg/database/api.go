@@ -315,16 +315,20 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 		ctx,
 		`
 			SELECT
-				client_name,
+				crawled.client_name,
 				crawled.network_id,
-				country,
-				updated_at,
+				crawled.country,
+				crawled.updated_at,
 				blocks.timestamp
-			FROM crawled_nodes AS crawled
+			FROM discovered_nodes AS disc
+			LEFT JOIN crawled_nodes AS crawled ON (
+				disc.node_id = crawled.node_id
+			)
 			LEFT JOIN blocks ON (
 				crawled.head_hash = blocks.block_hash
 				AND crawled.network_id = blocks.network_id
 			)
+			WHERE disc.last_found > unixepoch('now', '-24 hours')
 		`,
 	)
 	if err != nil {
