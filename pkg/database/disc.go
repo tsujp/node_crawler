@@ -42,6 +42,7 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 				last_found = unixepoch()
 			WHERE
 				network_address != excluded.network_address
+				OR unixepoch() - last_found > 3600 -- Update at most once per hour
 		`,
 		node.ID().Bytes(),
 		node.String(),
