@@ -18,7 +18,11 @@ templ NodeTable(nt database.NodeTable) {
 					<td>{ database.StringOrEmpty(nt.ClientName) }</td>
 				</tr>
 				<tr>
-					<td>Last Update</td>
+					<td>Last Found (Discovery)</td>
+					<td>{ nt.LastFound() }</td>
+				</tr>
+				<tr>
+					<td>Last Update (Crawled)</td>
 					<td>{ nt.UpdatedAt() }</td>
 				</tr>
 				<tr>

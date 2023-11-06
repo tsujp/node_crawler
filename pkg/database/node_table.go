@@ -21,6 +21,7 @@ func (h NodeTableHistory) CrawledAtLine() string {
 
 type NodeTable struct {
 	nodeID         []byte
+	lastFound      time.Time
 	updatedAt      *time.Time
 	Enode          *string
 	ClientName     *string
@@ -214,6 +215,14 @@ func sinceUpdate(updatedAt *time.Time) string {
 	}
 
 	return since.Truncate(time.Second).String() + " ago"
+}
+
+func (n NodeTable) LastFound() string {
+	return fmt.Sprintf(
+		"%s (%s)",
+		sinceUpdate(&n.lastFound),
+		n.lastFound.UTC().Format(DateFormat),
+	)
 }
 
 func (n NodeTable) UpdatedAt() string {

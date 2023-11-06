@@ -32,6 +32,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		`
 			SELECT
 				disc.node_id,
+				disc.last_found,
 				crawled.updated_at,
 				network_address,
 				client_name,
@@ -62,11 +63,13 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 
 	nodePage := new(NodeTable)
 
+	var lastFound int64
 	var updatedAtInt, headHashTimeInt, nextCrawlInt *int64
 	var forkIDInt *uint32
 
 	err = row.Scan(
 		&nodePage.nodeID,
+		&lastFound,
 		&updatedAtInt,
 		&nodePage.Enode,
 		&nodePage.ClientName,
@@ -89,6 +92,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		return nil, fmt.Errorf("row scan failed: %w", err)
 	}
 
+	nodePage.lastFound = time.Unix(lastFound, 0)
 	nodePage.updatedAt = int64PrtToTimePtr(updatedAtInt)
 	nodePage.HeadHashTime = int64PrtToTimePtr(headHashTimeInt)
 	nodePage.nextCrawl = int64PrtToTimePtr(nextCrawlInt)
