@@ -37,6 +37,11 @@ const jsonIndent = "    "
 // as a JSON object.
 type NodeSet map[enode.ID]NodeJSON
 
+const (
+	DirectionAccept = "accept"
+	DirectionDial   = "dial"
+)
+
 type NodeJSON struct {
 	Seq uint64      `json:"seq"`
 	N   *enode.Node `json:"record"`

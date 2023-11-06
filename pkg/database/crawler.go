@@ -71,7 +71,8 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 			ON CONFLICT (node_id) DO UPDATE
 			SET
 				last_found = unixepoch(),
-				next_crawl = excluded.next_crawl;
+				next_crawl = excluded.next_crawl
+			WHERE ?4 == 'dial';
 
 			INSERT INTO crawl_history (
 				node_id,
@@ -125,13 +126,14 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 			)
 			ON CONFLICT (node_id) DO UPDATE
 			SET
-				last_found = unixepoch(),
 				next_crawl = excluded.next_crawl
+			WHERE ?5 == 'dial'
 		`,
 		node.ID(),
 		node.N.String(),
 		node.N.IP().String(),
 		db.nextCrawlNotEth+randomHourSeconds(),
+		node.Direction,
 	)
 	if err != nil {
 		return fmt.Errorf("exec failed: %w", err)
@@ -231,7 +233,15 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 			ON CONFLICT (node_id) DO UPDATE
 			SET
 				last_found = unixepoch(),
-				next_crawl = excluded.next_crawl;
+				-- Only update next_crawl if we initiated the connection.
+				-- Even if the peer initiated the the connection, we still
+				-- want to try dialing because we want to see if the node is
+				-- exposed.
+				next_crawl = CASE
+					WHEN ?16 == 'dial'
+						THEN excluded.next_crawl
+						ELSE next_crawl
+					END;
 
 			INSERT INTO crawl_history (
 				node_id,

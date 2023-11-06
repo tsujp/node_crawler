@@ -274,7 +274,7 @@ func (c *CrawlerV2) crawlPeer(fd net.Conn) {
 	c.getClientInfo(
 		conn,
 		nodeFromConn(pubKey, fd),
-		"accept",
+		common.DirectionAccept,
 	)
 }
 
@@ -386,6 +386,8 @@ func translateError(err error) (bool, string) {
 		return true, "invalid public key"
 	case strings.Contains(errStr, "corrupt input"):
 		return true, "corrupt input"
+	case strings.Contains(errStr, "could not rlp decode message"):
+		return true, "rlp decode"
 	default:
 		return false, errStr
 	}
@@ -402,7 +404,7 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 		c.ch <- common.NodeJSON{
 			N:         node,
 			EthNode:   true,
-			Direction: "dial",
+			Direction: common.DirectionDial,
 			Error:     errStr,
 		}
 
@@ -410,7 +412,7 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 	}
 	defer conn.Close()
 
-	c.getClientInfo(conn, node, "dial")
+	c.getClientInfo(conn, node, common.DirectionDial)
 }
 
 // Meant to be run as a goroutine
