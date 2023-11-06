@@ -75,31 +75,57 @@ templ NodeTable(nt database.NodeTable) {
 				</tr>
 			</tbody>
 		</table>
-		<div style="position: relative; width: max-content;">
+		<div style="position: relative; width: max-content; margin: 1em 0;">
 			<image width="800px" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Blue_Marble_2002.png/1280px-Blue_Marble_2002.png"></image>
 			<image style="REPLACE_THIS_ETH_LOGO" height="10%" src="https://ethereum.org/static/2aba39d4e25d90caabb0c85a58c6aba9/f41b0/eth-glyph-colored.png"></image>
 		</div>
 		<h3>Crawl Hitory</h3>
-		<table>
-			<thead>
-				<tr>
-					<td>Timestamp</td>
-					<td>Since</td>
-					<td>Direction</td>
-					<td>Error</td>
-				</tr>
-			</thead>
-			<tbody>
-				for _, row := range nt.History {
-					<tr>
-						<td>{ row.CrawledAt.UTC().Format(database.DateFormat) }</td>
-						<td>{ row.CrawledAtLine() }</td>
-						<td>{ row.Direction }</td>
-						<td>{ row.Error }</td>
-					</tr>
-				}
-			</tbody>
-		</table>
+		<div style="display: flex; flex-wrap: wrap; column-gap: 2em;">
+			<div style="display: flex; flex-direction: column; align-items: center; gap: 0.5em; border: 1px solid orange; border-radius: 1em; padding: 1em;">
+				<h4 style="margin: 0;">Accept</h4>
+				<span>Connections initiated by the node</span>
+				<table>
+					<thead>
+						<tr>
+							<td>Timestamp</td>
+							<td>Since</td>
+							<td>Error</td>
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range nt.HistoryAccept {
+							<tr>
+								<td>{ row.CrawledAt.UTC().Format(database.DateFormat) }</td>
+								<td>{ row.CrawledAtLine() }</td>
+								<td>{ row.Error }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+			<div style="display: flex; flex-direction: column; align-items: center; gap: 0.5em; border: 1px solid orange; border-radius: 1em; padding: 1em;">
+				<h4 style="margin: 0;">Dial</h4>
+				<span>Connections initiated by the crawler</span>
+				<table>
+					<thead>
+						<tr>
+							<td>Timestamp</td>
+							<td>Since</td>
+							<td>Error</td>
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range nt.HistoryDial {
+							<tr>
+								<td>{ row.CrawledAt.UTC().Format(database.DateFormat) }</td>
+								<td>{ row.CrawledAtLine() }</td>
+								<td>{ row.Error }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
 	</div>
 }
 
@@ -504,7 +530,7 @@ templ Index(main templ.Component, networkID int64, synced int) {
 			<style type="text/css">
 				body {
 					margin: 0;
-					background-color: #222;
+					background-color: #111;
 					color: #eee;
 				}
 				a:link {
@@ -513,6 +539,9 @@ templ Index(main templ.Component, networkID int64, synced int) {
 				a:visited {
 					color: orange;
 				}
+				table {
+					border-collapse: collapse;
+				}
 				td {
 					padding: 0.5em 1em;
 					word-break: break-all;
@@ -520,8 +549,20 @@ templ Index(main templ.Component, networkID int64, synced int) {
 				td:first-child {
 					white-space: nowrap;
 				}
-				tr:nth-of-type(even) {
+				thead tr {
 					background-color: #333;
+				}
+				thead {
+					border-block-end: 2px solid #aaa;
+				}
+				tbody tr:nth-of-type(odd) {
+					background-color: #222;
+				}
+				tbody tr:nth-of-type(even) {
+					background-color: #333;
+				}
+				table td + td {
+					border-inline-start: 1px solid #aaa;
 				}
 				nav {
 					background-color: #333;

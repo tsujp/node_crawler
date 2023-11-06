@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/metrics"
 )
 
@@ -103,12 +104,19 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 			SELECT
 				crawled_at,
 				direction,
-				coalesce(error, '')
-			FROM crawl_history
-			WHERE
-				node_id = ?
-			ORDER BY crawled_at DESC
-			LIMIT 10
+				error
+			FROM (
+				SELECT
+					crawled_at,
+					direction,
+					coalesce(error, '') AS error,
+					row_number() OVER (PARTITION BY direction) AS row
+				FROM crawl_history
+				WHERE
+					node_id = ?
+				ORDER BY crawled_at DESC
+			)
+			WHERE row <= 10
 		`,
 		nodeIDBytes,
 	)
@@ -132,7 +140,11 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 
 		history.CrawledAt = time.Unix(crawledAtInt, 0)
 
-		nodePage.History = append(nodePage.History, history)
+		if history.Direction == common.DirectionAccept {
+			nodePage.HistoryAccept = append(nodePage.HistoryAccept, history)
+		} else {
+			nodePage.HistoryDial = append(nodePage.HistoryDial, history)
+		}
 	}
 
 	err = rows.Err()

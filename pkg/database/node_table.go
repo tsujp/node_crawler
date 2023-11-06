@@ -39,7 +39,8 @@ type NodeTable struct {
 	Longitude      *float64
 	nextCrawl      *time.Time
 
-	History []NodeTableHistory
+	HistoryAccept []NodeTableHistory
+	HistoryDial   []NodeTableHistory
 }
 
 func (n NodeTable) RLPXVersion() string {
