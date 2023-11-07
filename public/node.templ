@@ -181,7 +181,11 @@ templ NodeList(nodes database.NodeList) {
 							} else {
 								<td></td>
 							}
-							<td title={ row.UpdatedAt.UTC().Format(database.DateFormat) }>{ row.SinceUpdate() }</td>
+							if row.UpdatedAt != nil {
+								<td title={ row.UpdatedAt.UTC().Format(database.DateFormat) }>{ row.SinceUpdate() }</td>
+							} else {
+								<td></td>
+							}
 							if row.Country != nil {
 								<td>{ *row.Country }</td>
 							} else {

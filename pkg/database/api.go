@@ -178,13 +178,16 @@ func (db *DB) GetNodeList(
 		ctx,
 		`
 			SELECT
-				node_id,
-				updated_at,
-				client_name,
-				country,
+				disc.node_id,
+				crawled.updated_at,
+				crawled.client_name,
+				crawled.country,
 				blocks.timestamp,
 				COUNT(*) OVER () AS total
-			FROM crawled_nodes AS crawled
+			FROM discovered_nodes AS disc
+			LEFT JOIN crawled_nodes AS crawled ON (
+				disc.node_id = crawled.node_id
+			)
 			LEFT JOIN blocks ON (
 				crawled.head_hash = blocks.block_hash
 				AND crawled.network_id = blocks.network_id
@@ -210,10 +213,14 @@ func (db *DB) GetNodeList(
 				)
 				AND (  -- Query filter
 					?3 = ''
-					OR ip_address = ?3
-					OR hex(node_id) LIKE upper(?3 || '%')
+					OR disc.ip_address = ?3
+					OR hex(disc.node_id) LIKE upper(?3 || '%')
 				)
-			ORDER BY node_id
+				AND (  -- If query is empty, crawled can't be NULL
+					?3 != ''
+					OR crawled.node_id IS NOT NULL
+				)
+			ORDER BY disc.node_id
 			LIMIT ?4
 			OFFSET ?5
 		`,
