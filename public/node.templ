@@ -146,13 +146,7 @@ templ NodeList(nodes database.NodeList) {
 			<h3>Nodes</h3>
 			@NetworkFilterLinks(fmt.Sprintf("/nodes/?network=%%d&page=%d&synced=%d&q=%s", nodes.PageNumber, nodes.Synced, nodes.Query), nodes.NetworkFilter)
 			@SyncedFilterLinks(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%%d&q=%s", nodes.NetworkFilter, nodes.PageNumber, nodes.Query), nodes.Synced)
-			<div style="display:none">
-				for _, networkID := range nodes.Networks {
-					<a href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&q=%s", networkID, nodes.PageNumber, nodes.Query)) }>
-						{ database.NetworkName(&networkID) }
-					</a>
-				}
-			</div>
+
 			<form action="/nodes" method="get">
 				<input name="network" type="hidden" value={ strconv.FormatInt(nodes.NetworkFilter, 10) } />
 				<input name="page" type="hidden" value={ strconv.Itoa(nodes.PageNumber) } />
@@ -161,6 +155,32 @@ templ NodeList(nodes database.NodeList) {
 				<input class={ pageButton(), pageButtonActive() } name="q" type="text" placeholder="Search IP or Node ID" value={ nodes.Query } />
 				<input class={ pageButton(), pageButtonActive() } type="submit" value="Search" />
 			</form>
+
+			<div style="display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.5em;">
+				<a
+					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", nodes.NetworkFilter, nodes.Synced)) }
+					class={
+						pageButton(),
+						templ.KV(pageButtonActive(), nodes.Query == ""),
+						templ.KV(pageButtonInactive(), nodes.Query != ""),
+					}
+				>
+					All
+				</a>
+
+				for _, c := range []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"} {
+					<a
+						href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=%s", nodes.NetworkFilter, nodes.Synced, c)) }
+						class={
+							pageButton(),
+							templ.KV(pageButtonActive(), nodes.Query == c),
+							templ.KV(pageButtonInactive(), nodes.Query != c),
+						}
+					>
+						{ c }
+					</a>
+				}
+			</div>
 
 			<table style="width:100%">
 				<thead>
@@ -196,12 +216,36 @@ templ NodeList(nodes database.NodeList) {
 					}
 				</tbody>
 			</table>
-			<div style="display:flex;flex-direction:row;justify-content:space-between;align-items:center;gap:2em">
-				@nodesCount(nodes)
-				@pageNumberButtons(nodes)
+			<div style="display:flex; flex-direction:row; justify-content:flex-end; align-items:center; gap:2em;">
+				<a
+					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", nodes.NetworkFilter, nodes.PageNumber-1, nodes.Synced, nodes.Query)) }
+					class={ pageButton(), pageButtonActive(), templ.KV(disabled(), nodes.PageNumber == 1) }
+				>
+					Previous
+				</a>
+				<span>{ strconv.Itoa(nodes.PageNumber) }</span>
+				<a
+					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", nodes.NetworkFilter, nodes.PageNumber+1, nodes.Synced, nodes.Query)) }
+					class={ pageButton(), pageButtonActive(), templ.KV(disabled(), !nodes.HasNextPage) }
+				>
+					Next
+				</a>
 			</div>
 		</div>
 	</div>
+}
+
+css disabled() {
+	pointer-events: none;
+	filter: saturate(0);
+}
+
+func boolToStr(b bool) string {
+	if b {
+		return "true"
+	}
+
+	return "false"
 }
 
 templ HistoryList(history database.HistoryList) {
@@ -339,90 +383,7 @@ templ HistoryList(history database.HistoryList) {
 	</div>
 }
 
-templ nodesCount(nodes database.NodeList) {
-	if nodes.Total == 1 {
-		<span>1 Node</span>
-	} else if nodes.Total < nodes.PageSize {
-		<span>{ strconv.Itoa(nodes.Total) } Nodes</span>
-	} else {
-		<span>
-			{ strconv.Itoa(nodes.Offset+1) }
-			to
-			{ strconv.Itoa(min(nodes.Offset+nodes.PageSize, nodes.Total)) }
-			of
-			{ strconv.Itoa(nodes.Total) }
-			Nodes
-		</span>
-	}
-}
-
-templ pageNumberButtons(nodes database.NodeList) {
-	if nodes.Total < nodes.PageSize {
-		<div></div>
-	} else {
-		<div style="display:flex;flex-direction:row;align-items:center">
-			if nodes.NPages() < 10 {
-				for i := 1; i <= nodes.NPages(); i++ {
-					@pageNumberButton(nodes.NetworkFilter, i, i == nodes.PageNumber, nodes.Synced, nodes.Query)
-				}
-			} else {
-				if nodes.PageNumber > 6 {
-					@pageNumberButton(nodes.NetworkFilter, 1, false, nodes.Synced, nodes.Query)
-					@spacer()
-				}
-				for i := startPage(nodes); i <= endPage(nodes); i++ {
-					@pageNumberButton(nodes.NetworkFilter, i, i == nodes.PageNumber, nodes.Synced, nodes.Query)
-				}
-				if nodes.PageNumber < nodes.NPages() - 4 {
-					@spacer()
-					@pageNumberButton(nodes.NetworkFilter, nodes.NPages(), false, nodes.Synced, nodes.Query)
-				}
-			}
-		</div>
-	}
-}
-
-func startPage(nodes database.NodeList) int {
-	if nodes.PageNumber < 7 {
-		return 1
-	}
-
-	if nodes.PageNumber > nodes.NPages()-5 {
-		return nodes.NPages() - 8
-	}
-
-	return nodes.PageNumber - 3
-}
-
-func endPage(nodes database.NodeList) int {
-	if nodes.PageNumber < 6 {
-		return 9
-	}
-
-	if nodes.PageNumber > nodes.NPages()-5 {
-		return nodes.NPages()
-	}
-
-	return nodes.PageNumber + 3
-}
-
-templ spacer() {
-	<div style="padding:0.5em 1em">
-		<span>...</span>
-	</div>
-}
-
 templ pageNumberButton(networkID int64, pageNumber int, isPage bool, synced int, query string) {
-	<a
- 		href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", networkID, pageNumber, synced, query)) }
- 		class={ 
-			pageButton(),
-			templ.KV(pageButtonActive(), isPage),
-			templ.KV(pageButtonInactive(), !isPage),
-		 }
-	>
-		{ strconv.Itoa(pageNumber) }
-	</a>
 }
 
 css pageButton() {
@@ -431,6 +392,7 @@ css pageButton() {
 	border-radius: 0.2em;
 	background-color: inherit;
 	color: inherit;
+	user-select: none;
 }
 
 css pageButtonActive() {

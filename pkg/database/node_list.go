@@ -2,7 +2,6 @@ package database
 
 import (
 	"encoding/hex"
-	"math"
 	"time"
 )
 
@@ -38,16 +37,10 @@ func (n NodeListRow) IsSynced() string {
 type NodeList struct {
 	PageNumber    int
 	PageSize      int
+	HasNextPage   bool
 	Synced        int
 	Offset        int
-	Total         int
 	NetworkFilter int64
 	Query         string
 	List          []NodeListRow
-
-	Networks []int64
-}
-
-func (l NodeList) NPages() int {
-	return int(math.Ceil(float64(l.Total) / float64(l.PageSize)))
 }

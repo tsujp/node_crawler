@@ -171,7 +171,7 @@ func (db *DB) GetNodeList(
 	start := time.Now()
 	defer metrics.ObserveDBQuery("get_node_list", start, err)
 
-	pageSize := 10
+	pageSize := 20
 	offset := (pageNumber - 1) * pageSize
 
 	rows, err := db.db.QueryContext(
@@ -182,8 +182,7 @@ func (db *DB) GetNodeList(
 				crawled.updated_at,
 				crawled.client_name,
 				crawled.country,
-				blocks.timestamp,
-				COUNT(*) OVER () AS total
+				blocks.timestamp
 			FROM discovered_nodes AS disc
 			LEFT JOIN crawled_nodes AS crawled ON (
 				disc.node_id = crawled.node_id
@@ -221,7 +220,7 @@ func (db *DB) GetNodeList(
 					OR crawled.node_id IS NOT NULL
 				)
 			ORDER BY disc.node_id
-			LIMIT ?4
+			LIMIT ?4 + 1
 			OFFSET ?5
 		`,
 		networkID,
@@ -238,16 +237,26 @@ func (db *DB) GetNodeList(
 	out := NodeList{
 		PageSize:      pageSize,
 		PageNumber:    pageNumber,
+		HasNextPage:   false,
 		Synced:        synced,
 		Offset:        offset,
-		Total:         0,
 		List:          []NodeListRow{},
-		Networks:      []int64{},
 		NetworkFilter: networkID,
 		Query:         query,
 	}
 
+	rowNumber := 0
 	for rows.Next() {
+		rowNumber++
+
+		// We added 1 to the LIMIT to see if there were any more rows for
+		// a next page. This is where we test for that.
+		if rowNumber > pageSize {
+			out.HasNextPage = true
+
+			break
+		}
+
 		row := NodeListRow{}
 		var updatedAtInt, headHashTimeInt *int64
 
@@ -257,7 +266,6 @@ func (db *DB) GetNodeList(
 			&row.ClientName,
 			&row.Country,
 			&headHashTimeInt,
-			&out.Total,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan row failed: %w", err)
@@ -272,42 +280,6 @@ func (db *DB) GetNodeList(
 	if err != nil {
 		return nil, fmt.Errorf("rows failed: %w", err)
 	}
-
-	rows.Close()
-
-	rows, err = db.db.QueryContext(
-		ctx,
-		`
-			SELECT
-				DISTINCT network_id
-			FROM crawled_nodes
-			WHERE
-				network_id IS NOT NULL
-			ORDER BY network_id
-		`,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("networks query failed: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var networkID int64
-
-		err = rows.Scan(&networkID)
-		if err != nil {
-			return nil, fmt.Errorf("networks scan failed: %w", err)
-		}
-
-		out.Networks = append(out.Networks, networkID)
-	}
-
-	err = rows.Err()
-	if err != nil {
-		return nil, fmt.Errorf("networks rows failed: %w", err)
-	}
-
-	rows.Close()
 
 	return &out, nil
 }
