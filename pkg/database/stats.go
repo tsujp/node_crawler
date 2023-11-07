@@ -7,10 +7,12 @@ import (
 )
 
 type Stats struct {
-	Client    Client
-	NetworkID *int64
-	Country   *string
-	Synced    string
+	Client     Client
+	NetworkID  *int64
+	ForkID     *uint32
+	NextForkID *uint64
+	Country    *string
+	Synced     string
 }
 
 func (s Stats) CountryStr() string {

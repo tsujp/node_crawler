@@ -281,7 +281,20 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	stats := a.getStats().Filter(
 		func(_ int, s database.Stats) bool {
-			return networkID == -1 || (s.NetworkID != nil && *s.NetworkID == networkID)
+			if networkID == -1 {
+				return true
+			}
+
+			if s.NetworkID == nil || s.ForkID == nil {
+				return false
+			}
+
+			if *s.NetworkID != networkID {
+				return false
+			}
+
+			_, ok := database.Forks[*s.NetworkID].Hash[*s.ForkID]
+			return ok
 		},
 		func(_ int, s database.Stats) bool {
 			return synced == -1 ||

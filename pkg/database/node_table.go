@@ -115,7 +115,7 @@ func isReadyForCancun(networkID *int64, forkID *uint32, nextForkID *uint64) int 
 		return -1
 	}
 
-	if forks.Hash[*forkID] == "Cancun" {
+	if forks.Hash[*forkID] == ForkNameCancun {
 		return 1
 	}
 

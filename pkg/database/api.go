@@ -317,6 +317,8 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 			SELECT
 				crawled.client_name,
 				crawled.network_id,
+				crawled.fork_id,
+				crawled.next_fork_id,
 				crawled.country,
 				crawled.updated_at,
 				blocks.timestamp
@@ -346,6 +348,8 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 		err := rows.Scan(
 			&name,
 			&stats.NetworkID,
+			&stats.ForkID,
+			&stats.NextForkID,
 			&stats.Country,
 			&updatedAtInt,
 			&blockTimestampInt,
