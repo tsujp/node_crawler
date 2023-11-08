@@ -239,9 +239,14 @@ func (db *DB) GetNodeList(
 	pageSize := 20
 	offset := (pageNumber - 1) * pageSize
 
+	hint := ""
+	if query.IP != "" {
+		hint = "INDEXED BY discovered_nodes_ip_address_node_id"
+	}
+
 	rows, err := db.db.QueryContext(
 		ctx,
-		`
+		fmt.Sprintf(`
 			SELECT
 				disc.node_id,
 				crawled.updated_at,
@@ -249,6 +254,7 @@ func (db *DB) GetNodeList(
 				crawled.country,
 				blocks.timestamp
 			FROM discovered_nodes AS disc
+				%s
 			LEFT JOIN crawled_nodes AS crawled ON (
 				disc.node_id = crawled.node_id
 			)
@@ -286,7 +292,7 @@ func (db *DB) GetNodeList(
 			ORDER BY disc.node_id
 			LIMIT ?6 + 1
 			OFFSET ?7
-		`,
+		`, hint),
 		networkID,
 		synced,
 		query.NodeIDStart,
