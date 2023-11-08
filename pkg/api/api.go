@@ -215,10 +215,25 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := a.db.GetNodeList(r.Context(), pageNumber, networkID, synced, query)
+	nodeListQuery, err := database.ParseNodeListQuery(query)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprintf(w, `Invalid query: "%s". Not a valid IP address, nor hex string.`, query)
+
+		return
+	}
+
+	nodes, err := a.db.GetNodeList(
+		r.Context(),
+		pageNumber,
+		networkID,
+		synced,
+		*nodeListQuery,
+	)
 	if err != nil {
 		log.Error("get node list failed", "err", err, "pageNumber", pageNumber)
 		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = fmt.Fprintln(w, "Internal Server Error")
 
 		return
 	}

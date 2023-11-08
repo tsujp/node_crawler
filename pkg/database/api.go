@@ -1,10 +1,12 @@
 package database
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"slices"
 	"time"
 
@@ -159,12 +161,75 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 	return nodePage, nil
 }
 
+type NodeListQuery struct {
+	Query       string
+	IP          string
+	NodeIDStart []byte
+	NodeIDEnd   []byte
+}
+
+var maxNodeID = bytes.Repeat([]byte{0xff}, 32)
+
+func ParseNodeListQuery(query string) (*NodeListQuery, error) {
+	queryIP := ""
+	var nodeIDStart []byte = nil
+	var nodeIDEnd []byte = nil
+
+	if query != "" {
+		ip := net.ParseIP(query)
+
+		if ip != nil {
+			queryIP = query
+		} else {
+			nodeIDFilter := query
+
+			if len(query)%2 == 1 {
+				nodeIDFilter += "0"
+			}
+
+			queryBytes, err := hex.DecodeString(nodeIDFilter)
+			if err != nil {
+				return nil, fmt.Errorf("hex decoding query failed: %w", err)
+			}
+
+			nodeIDStart = queryBytes
+
+			// If we had an odd number of digits in the query,
+			// OR the last byte with 0x0f
+			// Example:
+			//   query = 4
+			//   start = 0x40
+			//   end   = 0x4f
+			//
+			// else, query length was even,
+			// append 0xff to the node id end
+			// Example:
+			//   query = 40
+			//   start = 0x40
+			//   end   = 0x40ff
+			if len(query)%2 == 1 {
+				nodeIDEnd = bytes.Clone(queryBytes)
+				nodeIDEnd[len(nodeIDEnd)-1] |= 0x0f
+			} else {
+				nodeIDEnd = append(queryBytes, 0xff)
+			}
+		}
+	}
+
+	return &NodeListQuery{
+		Query:       query,
+		IP:          queryIP,
+		NodeIDStart: nodeIDStart,
+		NodeIDEnd:   nodeIDEnd,
+	}, nil
+}
+
 func (db *DB) GetNodeList(
 	ctx context.Context,
 	pageNumber int,
 	networkID int64,
 	synced int,
-	query string,
+	query NodeListQuery,
 ) (*NodeList, error) {
 	var err error
 
@@ -193,39 +258,40 @@ func (db *DB) GetNodeList(
 			)
 			WHERE
 				(      -- Network ID filter
-					crawled.network_id = ?1
-					OR ?1 = -1
+					?1 = -1
+					OR crawled.network_id = ?1
 				)
 				AND (  -- Synced filter
 					?2 = -1  -- All
 					OR (     -- Not synced
-						(
-							abs(crawled.updated_at - blocks.timestamp) >= 60
-							OR blocks.timestamp IS NULL
+						?2 = 0
+						AND (
+							blocks.timestamp IS NULL
+							OR abs(crawled.updated_at - blocks.timestamp) >= 60
 						)
-						AND ?2 = 0
 					)
 					OR (     -- Synced
-						abs(crawled.updated_at - blocks.timestamp) < 60
-						AND ?2 = 1
+						?2 = 1
+						AND abs(crawled.updated_at - blocks.timestamp) < 60
 					)
 				)
-				AND (  -- Query filter
-					?3 = ''
-					OR disc.ip_address = ?3
-					OR hex(disc.node_id) LIKE upper(?3 || '%')
+				AND (  -- Node ID filter
+					?3 IS NULL
+					OR (disc.node_id >= ?3 AND disc.node_id <= ?4)
 				)
-				AND (  -- If query is empty, crawled can't be NULL
-					?3 != ''
-					OR crawled.node_id IS NOT NULL
+				AND (  -- IP address filter
+					?5 = ''
+					OR disc.ip_address = ?5
 				)
 			ORDER BY disc.node_id
-			LIMIT ?4 + 1
-			OFFSET ?5
+			LIMIT ?6 + 1
+			OFFSET ?7
 		`,
 		networkID,
 		synced,
-		query,
+		query.NodeIDStart,
+		query.NodeIDEnd,
+		query.IP,
 		pageSize,
 		offset,
 	)
@@ -242,7 +308,7 @@ func (db *DB) GetNodeList(
 		Offset:        offset,
 		List:          []NodeListRow{},
 		NetworkFilter: networkID,
-		Query:         query,
+		Query:         query.Query,
 	}
 
 	rowNumber := 0
