@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS discovered_nodes (
 
 CREATE INDEX IF NOT EXISTS discovered_nodes_node_id_next_crawl
 	ON discovered_nodes (node_id, next_crawl);
-CREATE INDEX IF NOT EXISTS discovered_nodes_next_crawl_network_address
-	ON discovered_nodes (next_crawl, network_address);
+CREATE INDEX IF NOT EXISTS discovered_nodes_next_crawl
+	ON discovered_nodes (next_crawl);
 CREATE INDEX IF NOT EXISTS discovered_nodes_ip_address_node_id
 	ON discovered_nodes (ip_address, node_id);
 
