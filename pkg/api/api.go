@@ -160,6 +160,13 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	syncedStr := r.URL.Query().Get("synced")
 	query = r.URL.Query().Get("q")
 
+	// This is a full node ID, just redirect to the node's page
+	if len(query) == 64 {
+		http.Redirect(w, r, "/nodes/"+query, http.StatusTemporaryRedirect)
+
+		return
+	}
+
 	if pageNumStr == "" {
 		redirectURL = setQuery(redirectURL, "page", "1")
 		redirect = true
@@ -211,8 +218,7 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if redirect {
-		w.Header().Add("Location", redirectURL.String())
-		w.WriteHeader(http.StatusTemporaryRedirect)
+		http.Redirect(w, r, redirectURL.String(), http.StatusTemporaryRedirect)
 
 		return
 	}
@@ -290,8 +296,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if redirect {
-		w.Header().Add("Location", redirectURL.String())
-		w.WriteHeader(http.StatusTemporaryRedirect)
+		http.Redirect(w, r, redirectURL.String(), http.StatusTemporaryRedirect)
 
 		return
 	}
@@ -426,8 +431,7 @@ func (a *API) handleHistoryList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if redirect {
-		w.Header().Add("Location", redirectURL.String())
-		w.WriteHeader(http.StatusTemporaryRedirect)
+		http.Redirect(w, r, redirectURL.String(), http.StatusTemporaryRedirect)
 
 		return
 	}
