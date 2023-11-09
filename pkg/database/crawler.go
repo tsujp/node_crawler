@@ -71,8 +71,11 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 			ON CONFLICT (node_id) DO UPDATE
 			SET
 				last_found = unixepoch(),
-				next_crawl = excluded.next_crawl
-			WHERE ?4 == 'dial';
+				next_crawl = CASE
+					WHEN ?4 == 'dial'
+					THEN excluded.next_crawl
+					ELSE next_crawl
+				END;
 
 			INSERT INTO crawl_history (
 				node_id,

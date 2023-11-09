@@ -116,7 +116,10 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 					crawled_at,
 					direction,
 					coalesce(error, '') AS error,
-					row_number() OVER (PARTITION BY direction) AS row
+					row_number() OVER (
+						PARTITION BY direction
+						ORDER BY crawled_at DESC
+					) AS row
 				FROM crawl_history
 				WHERE
 					node_id = ?
