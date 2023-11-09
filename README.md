@@ -240,6 +240,7 @@ Your example `configuration.nix`:
     nodeCrawler = {
       enable = true;
       hostName = "server hostname";
+      api.enodePubkey = "asdf1234...";
       nginx = {
         forceSSL = true;
         enableACME = true;
@@ -268,3 +269,17 @@ Your example `configuration.nix`:
   };
 }
 ```
+
+### TODO
+- [ ] Enums instead of numbers in the URLs
+- [ ] More stats
+  - [ ] Client Versions
+  - [ ] Countries link to show cities in that country
+- [ ] More filters
+  - [ ] Country/City
+  - [ ] OS/Arch
+- [ ] Custom inputs for Network ID filter
+- [ ] Info/help where more details could be useful
+- [ ] Expand help page
+  - [ ] What do the error messages mean, what should the user do for each one?
+  - [ ] Instructions on how to connect for each client

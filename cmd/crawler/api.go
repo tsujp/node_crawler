@@ -24,6 +24,7 @@ var (
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
 			&dropNodesTimeFlag,
+			&enodeFlag,
 			&metricsAddressFlag,
 			&statsUpdateFrequencyFlag,
 		},
@@ -47,6 +48,7 @@ func startAPI(cCtx *cli.Context) error {
 	api := api.New(
 		database.NewAPIDB(db),
 		statsUpdateFrequencyFlag.Get(cCtx),
+		enodeFlag.Get(cCtx),
 	)
 	go api.StartServer(
 		wg,

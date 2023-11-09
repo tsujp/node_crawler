@@ -27,4 +27,9 @@ services:
       - 9192:9191/tcp    # Metrics
     depends_on:
       - crawler
-    command: "api --crawler-db /data/crawler.db"
+    command: 
+      - api
+      - --crawler-db
+      - /data/crawler.db
+      - --enode
+      - "enode://asdf1234...@example.com:30303"

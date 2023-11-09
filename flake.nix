@@ -198,6 +198,19 @@
                 default = "0.0.0.0:9190";
                 description = "Address on which the metrics server listens. This is NOT added to the firewall.";
               };
+
+              enodePubkey = mkOption {
+                type = types.str;
+                default = "";
+                description = "Public key of the crawler. Use the CLI to get it: `crawler print-enode node.key host port`";
+                example = "0401edb73871c1ce0ebc2203bbc12c7b3b3a2d57fc72533f...";
+              };
+
+              enode = mkOption {
+                type = types.str;
+                default = "enode://${cfg.api.enodePubkey}@${cfg.hostName}:${toString cfg.crawler.nodeListenPort}";
+                description = "Enode of the crawler. Used in the /help page to show how to connect to the node.";
+              };
             };
 
             crawler = {
@@ -270,13 +283,19 @@
                 default = "336h"; # 14d
                 description = "Next crawl value if the node was not an eth node.";
               };
+
+              nodeListenPort = mkOption {
+                type = types.port;
+                default = 30303;
+                description = "Port number for the node listen address.";
+              };
             };
           };
 
           config = mkIf cfg.enable {
             networking.firewall = mkIf cfg.crawler.openFirewall {
-              allowedUDPPorts = [ 30303 ];
-              allowedTCPPorts = [ 30303 ];
+              allowedUDPPorts = [ cfg.crawler.nodeListenPort ];
+              allowedTCPPorts = [ cfg.crawler.nodeListenPort ];
             };
 
             systemd.services = {
@@ -296,6 +315,7 @@
                       "--next-crawl-success=${cfg.crawler.nextCrawlSuccess}"
                       "--next-crawl-fail=${cfg.crawler.nextCrawlFail}"
                       "--next-crawl-not-eth=${cfg.crawler.nextCrawlNotEth}"
+                      "--node-addr=0.0.0.0:${toString cfg.crawler.nodeListenPort}"
                     ]
                     ++ optional (cfg.crawler.network == "goerli") "--goerli"
                     ++ optional (cfg.crawler.network == "holesky") "--holesky"
@@ -326,6 +346,7 @@
                       "--api-addr=${apiAddress}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
                       "--metrics-addr=${cfg.api.metricsAddress}"
+                      "--enode=${cfg.api.enode}"
                     ];
                   in
                   "${pkgs.nodeCrawler}/bin/crawler --pprof=${if cfg.api.pprof then "true" else "false"} api ${concatStringsSep " " args}";

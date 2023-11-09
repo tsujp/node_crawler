@@ -20,15 +20,17 @@ import (
 type API struct {
 	db                   *database.DB
 	statsUpdateFrequency time.Duration
+	enode                string
 
 	stats     database.AllStats
 	statsLock sync.Mutex
 }
 
-func New(db *database.DB, statsUpdateFrequency time.Duration) *API {
+func New(db *database.DB, statsUpdateFrequency time.Duration, enode string) *API {
 	api := &API{
 		db:                   db,
 		statsUpdateFrequency: statsUpdateFrequency,
+		enode:                enode,
 
 		stats: database.AllStats{},
 	}
@@ -456,6 +458,13 @@ func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(public.Favicon)
 }
 
+func (a *API) handleHelp(w http.ResponseWriter, r *http.Request) {
+	helpPage := public.HelpPage(a.enode)
+
+	index := public.Index(helpPage, 1, -1)
+	_ = index.Render(r.Context(), w)
+}
+
 func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 	defer wg.Done()
 
@@ -465,6 +474,7 @@ func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 	router.HandleFunc("/favicon.ico", handleFavicon)
 	router.HandleFunc("/history/", a.handleHistoryList)
 	router.HandleFunc("/nodes/", a.nodesHandler)
+	router.HandleFunc("/help/", a.handleHelp)
 
 	log.Info("Starting API", "address", address)
 	_ = http.ListenAndServe(address, router)

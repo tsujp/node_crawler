@@ -47,7 +47,8 @@ func init() {
 	app.Commands = []*cli.Command{
 		apiCommand,
 		crawlerCommand,
-		&cli.Command{
+		printEnodeCommand,
+		{
 			Name: "migrate-db",
 			Action: func(ctx *cli.Context) error {
 				oldName := ctx.Args().Get(0)

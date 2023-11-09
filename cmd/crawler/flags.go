@@ -45,6 +45,11 @@ var (
 		Usage: "Time to drop crawled nodes without any updates",
 		Value: 24 * time.Hour,
 	}
+	enodeFlag = cli.StringFlag{
+		Name:     "enode",
+		Usage:    "Enode of the crawler",
+		Required: true,
+	}
 	geoipdbFlag = cli.StringFlag{
 		Name:  "geoipdb",
 		Usage: "geoip2 database location",

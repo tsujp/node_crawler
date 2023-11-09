@@ -133,6 +133,48 @@ templ NodeTable(nt database.NodeTable) {
 	</div>
 }
 
+templ HelpPage(enode string) {
+	<div style="display: flex; flex-direction: column; gap: 1em; padding: 1em;">
+		<h2>Help</h2>
+		<div style="display: flex; flex-direction: column; gap: 0.5em;">
+			<h3>Add your node</h3>
+			<span>If your node is not found, it can be easily added.</span>
+			<h4>Geth</h4>
+			<span>Run the following command in the Javascript console:</span>
+			<code>
+				admin.addPeer(
+					'{ enode }'
+				)
+			</code>
+			<span>Or, as a command:</span>
+			<code>
+				geth --exec "admin.addPeer('{ enode }')"
+			</code>
+			<span>If you run Geth in a container:</span>
+			<code>
+				docker exec CONTAINER_NAME geth --exec "admin.addPeer('{ enode }')" attach /ethclient/geth/geth.ipc
+			</code>
+
+			<h3>Find your node ID</h3>
+			<span>Find your node ID so you can find your node on the website</span>
+			<h4>Geth</h4>
+			<span>Run the following command in the JavaScript console:</span>
+			<code>
+				admin.nodeInfo.id
+			</code>
+			<span>Or, as a command:</span>
+			<code>
+				geth --exec "admin.nodeInfo.id"
+			</code>
+			<span>If you run Geth in a container:</span>
+			<code>
+				docker exec CONTAINER_NAME geth --exec "admin.nodeInfo.id" attach /ethclient/geth/geth.ipc
+			</code>
+		</div>
+
+	</div>
+}
+
 css nodeListClass() {
 	display: flex;
 	flex-direction: row;
@@ -570,6 +612,7 @@ templ Index(main templ.Component, networkID int64, synced int) {
 					<li><a href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", networkID, synced)) }>Stats</a></li>
 					<li><a href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", networkID, synced)) }>Nodes</a></li>
 					<li><a href={ templ.URL(fmt.Sprintf("/history/?network=%d", networkID)) }>Crawl History</a></li>
+					<li><a href="/help">Help</a></li>
 				</ul>
 			</nav>
 			<main>
