@@ -18,8 +18,8 @@ npm-debug.log*
 
 # application
 /data/
-api.db*
-crawler.db*
+/*.db
+/*.db-*
 node-crawler-backend
 node-crawler-backend.exe
 node.key
