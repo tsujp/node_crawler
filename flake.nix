@@ -97,7 +97,7 @@
             go_1_21
             golangci-lint
             nodejs
-            sqlite
+            sqlite-interactive
             templ
           ];
         };
