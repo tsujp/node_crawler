@@ -198,7 +198,7 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if syncedStr == "" {
-		redirectURL = setQuery(redirectURL, "synced", "-1")
+		redirectURL = setQuery(redirectURL, "synced", "1")
 		redirect = true
 	} else {
 		synced, err = strconv.Atoi(syncedStr)
@@ -276,7 +276,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if syncedStr == "" {
-		redirectURL = setQuery(redirectURL, "synced", "-1")
+		redirectURL = setQuery(redirectURL, "synced", "1")
 		redirect = true
 	} else {
 		synced, err = strconv.Atoi(syncedStr)
