@@ -53,9 +53,9 @@ func openSQLiteDB(
 	}
 
 	if journalMode != "" {
-		err = setPragma(db, "PRAGMA journal_mode = WAL", "wal")
+		err = setPragma(db, "PRAGMA journal_mode = "+journalMode, journalMode)
 		if err != nil {
-			return nil, fmt.Errorf("setting journal_mode = WAL failed: %w", err)
+			return nil, fmt.Errorf("setting journal_mode = %s failed: %w", journalMode, err)
 		}
 
 		err = setPragma(db, "PRAGMA synchronous = NORMAL", "")
