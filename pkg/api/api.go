@@ -315,7 +315,15 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 				return false
 			}
 
-			_, ok := database.Forks[*s.NetworkID].Hash[*s.ForkID]
+			fork, ok := database.Forks[*s.NetworkID]
+
+			// If fork is not known, keep the stats.
+			if !ok {
+				return true
+			}
+
+			// If the fork is known, the fork ID should be in the set.
+			_, ok = fork.Hash[*s.ForkID]
 			return ok
 		},
 		func(_ int, s database.Stats) bool {
