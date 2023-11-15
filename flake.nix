@@ -61,7 +61,7 @@
             src = gitignoreSource ./.;
             subPackages = [ "cmd/crawler" ];
 
-            vendorHash = "sha256-MgfbQY6mZcD2uIbuRjB/xDmEy3/iXFsC7028r9j3k8U=";
+            vendorHash = "sha256-0rRu81KnbBWICPvE6m2/OkXifOO+uW/SYSIFCVHM3YY=";
 
             doCheck = false;
 
@@ -93,7 +93,20 @@
         };
 
         devshells.default = {
+          commands = [
+            {
+              name = "go-mod-upgrade";
+              help = "Upgrades the go dependencies. Prints the new vendorHash.";
+              command = ''
+                go get -u ./... && \
+                go mod tidy && \
+                nix-prefetch --option extra-experimental-features flakes --silent \
+                  '{ sha256 }: (builtins.getFlake (toString ./.)).packages.x86_64-linux.nodeCrawler.goModules.overrideAttrs (_: { vendorSha256 = sha256; })'
+              '';
+            }
+          ];
           packages = with pkgs; [
+            nix-prefetch
             go_1_21
             golangci-lint
             nodejs
