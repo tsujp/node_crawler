@@ -158,6 +158,12 @@
               description = "Name of the file within the `stateDir` for storing the data for the crawler.";
             };
 
+            backupFilename = mkOption {
+              type = types.str;
+              default = "backups/crawler_20060102150405.db";
+              description = "Daily backup filename.";
+            };
+
             user = mkOption {
               type = types.str;
               default = "nodecrawler";
@@ -321,14 +327,15 @@
                   ExecStart =
                   let
                     args = [
+                      "--backup-name=${cfg.backupFilename}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
                       "--geoipdb=${cfg.crawler.geoipdb}"
-                      "--workers=${toString cfg.crawler.workers}"
                       "--metrics-addr=${cfg.crawler.metricsAddress}"
-                      "--next-crawl-success=${cfg.crawler.nextCrawlSuccess}"
                       "--next-crawl-fail=${cfg.crawler.nextCrawlFail}"
                       "--next-crawl-not-eth=${cfg.crawler.nextCrawlNotEth}"
+                      "--next-crawl-success=${cfg.crawler.nextCrawlSuccess}"
                       "--node-addr=0.0.0.0:${toString cfg.crawler.nodeListenPort}"
+                      "--workers=${toString cfg.crawler.workers}"
                     ]
                     ++ optional (cfg.crawler.network == "goerli") "--goerli"
                     ++ optional (cfg.crawler.network == "holesky") "--holesky"
@@ -357,9 +364,10 @@
                   let
                     args = [
                       "--api-addr=${apiAddress}"
+                      "--backup-name=${cfg.backupFilename}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
-                      "--metrics-addr=${cfg.api.metricsAddress}"
                       "--enode=${cfg.api.enode}"
+                      "--metrics-addr=${cfg.api.metricsAddress}"
                     ];
                   in
                   "${pkgs.nodeCrawler}/bin/crawler --pprof=${if cfg.api.pprof then "true" else "false"} api ${concatStringsSep " " args}";

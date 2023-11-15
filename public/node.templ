@@ -3,6 +3,8 @@ package public
 import "github.com/ethereum/node-crawler/pkg/database"
 import "strconv"
 import "fmt"
+import "io/fs"
+import "time"
 
 templ NodeTable(nt database.NodeTable) {
 	<div style="margin: 1em;">
@@ -130,6 +132,34 @@ templ NodeTable(nt database.NodeTable) {
 				</table>
 			</div>
 		</div>
+	</div>
+}
+
+templ BackupsList(files []fs.FileInfo) {
+	<div style="margin: 1em;">
+		<h3>Backups</h3>
+		<table style="max-width=100%">
+			<thead>
+				<tr>
+					<td>Filename</td>
+					<td>Size</td>
+					<td>Modified (UTC)</td>
+				</tr>
+			</thead>
+			<tbody>
+				for _, file := range files {
+					<tr>
+						<td>
+							<a href={ templ.URL(fmt.Sprintf("/backups/%s", file.Name())) }>
+								{ file.Name() }
+							</a>
+						</td>
+						<td>{ strconv.FormatInt(file.Size(), 10) }</td>
+						<td>{ file.ModTime().Format(time.DateTime) }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
 	</div>
 }
 

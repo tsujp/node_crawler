@@ -24,6 +24,11 @@ var (
 			"https://www.sqlite.org/pragma.html#pragma_auto_vacuum"),
 		Value: "INCREMENTAL",
 	}
+	backupFilenameFlag = cli.StringFlag{
+		Name:  "backup-name",
+		Usage: "Backup name. Passed to time.Format.",
+		Value: "backups/crawler_20060102150405.db",
+	}
 	bootnodesFlag = cli.StringSliceFlag{
 		Name: "bootnodes",
 		Usage: ("Comma separated nodes used for bootstrapping. " +

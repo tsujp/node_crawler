@@ -18,6 +18,7 @@ npm-debug.log*
 
 # application
 /data/
+/backups/
 /*.db
 /*.db-*
 node-crawler-backend

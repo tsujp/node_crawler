@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"sync"
 
 	_ "modernc.org/sqlite"
@@ -21,6 +22,7 @@ var (
 		Action: startAPI,
 		Flags: []cli.Flag{
 			&apiListenAddrFlag,
+			&backupFilenameFlag,
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
 			&dropNodesTimeFlag,
@@ -49,6 +51,7 @@ func startAPI(cCtx *cli.Context) error {
 		database.NewAPIDB(db),
 		statsUpdateFrequencyFlag.Get(cCtx),
 		enodeFlag.Get(cCtx),
+		path.Base(backupFilenameFlag.Get(cCtx)),
 	)
 	go api.StartServer(
 		wg,

@@ -5,8 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/url"
+	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,16 +24,23 @@ type API struct {
 	db                   *database.DB
 	statsUpdateFrequency time.Duration
 	enode                string
+	backupDir            string
 
 	stats     database.AllStats
 	statsLock sync.Mutex
 }
 
-func New(db *database.DB, statsUpdateFrequency time.Duration, enode string) *API {
+func New(
+	db *database.DB,
+	statsUpdateFrequency time.Duration,
+	enode string,
+	backupDir string,
+) *API {
 	api := &API{
 		db:                   db,
 		statsUpdateFrequency: statsUpdateFrequency,
 		enode:                enode,
+		backupDir:            backupDir,
 
 		stats: database.AllStats{},
 	}
@@ -477,6 +487,88 @@ func (a *API) handleHelp(w http.ResponseWriter, r *http.Request) {
 	_ = index.Render(r.Context(), w)
 }
 
+func allFiles(dirName string) ([]fs.FileInfo, error) {
+	dir, err := os.ReadDir(dirName)
+	if err != nil {
+		return nil, fmt.Errorf("reading dir: %s failed: %w", dir, err)
+	}
+
+	files := []fs.FileInfo{}
+	for _, file := range dir {
+		if file.IsDir() {
+			continue
+		}
+
+		// Not a complete backup
+		if !strings.HasSuffix(file.Name(), ".sz") {
+			continue
+		}
+
+		info, err := file.Info()
+		if err != nil {
+			return nil, fmt.Errorf("file info for: %s failed: %w", file.Name(), err)
+		}
+
+		files = append(files, info)
+	}
+
+	slices.SortStableFunc(files, func(a, b fs.FileInfo) int {
+		if a.ModTime().Before(b.ModTime()) {
+			return 1
+		}
+
+		if a.ModTime().Equal(b.ModTime()) {
+			return 0
+		}
+
+		return -1
+	})
+
+	return files, nil
+}
+
+func (a *API) handleBackupsList(w http.ResponseWriter, r *http.Request) {
+	files, err := allFiles(a.backupDir)
+	if err != nil {
+		log.Error("listing backups failed", "err", err)
+
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, "Internal Server Error\n")
+
+		return
+	}
+
+	backupList := public.BackupsList(files)
+
+	index := public.Index(backupList, 1, 1)
+	_ = index.Render(r.Context(), w)
+}
+
+func (a *API) handleBackups(w http.ResponseWriter, r *http.Request) {
+	urlPath := r.URL.Path
+
+	split := strings.Split(strings.Trim(urlPath, "/"), "/")
+
+	if len(split) == 1 {
+		a.handleBackupsList(w, r)
+
+		return
+	}
+
+	if len(split) == 2 {
+		fileServer := http.FileServer(http.Dir(a.backupDir))
+
+		rCopy := r.Clone(r.Context())
+		rCopy.URL.Path = split[1]
+		fileServer.ServeHTTP(w, rCopy)
+
+		return
+	}
+
+	w.WriteHeader(http.StatusBadRequest)
+	fmt.Fprint(w, "Bad Request")
+}
+
 func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 	defer wg.Done()
 
@@ -484,9 +576,10 @@ func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 
 	router.HandleFunc("/", a.handleRoot)
 	router.HandleFunc("/favicon.ico", handleFavicon)
+	router.HandleFunc("/backups/", a.handleBackups)
+	router.HandleFunc("/help/", a.handleHelp)
 	router.HandleFunc("/history/", a.handleHistoryList)
 	router.HandleFunc("/nodes/", a.nodesHandler)
-	router.HandleFunc("/help/", a.handleHelp)
 
 	log.Info("Starting API", "address", address)
 	_ = http.ListenAndServe(address, router)

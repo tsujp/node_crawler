@@ -53,6 +53,7 @@ var (
 		Action: crawlNodesV2,
 		Flags: []cli.Flag{
 			&autovacuumFlag,
+			&backupFilenameFlag,
 			&bootnodesFlag,
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
@@ -166,8 +167,8 @@ func crawlNodesV2(cCtx *cli.Context) error {
 		return fmt.Errorf("create tables failed: %w", err)
 	}
 
-	// go db.AnalyzeDaemon(6 * time.Hour)
 	go db.TableStatsMetricsDaemon(5 * time.Minute)
+	go db.BackupDaemon(backupFilenameFlag.Get(cCtx))
 
 	nodeKey, err := readNodeKey(cCtx)
 	if err != nil {
