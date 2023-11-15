@@ -169,6 +169,7 @@ func crawlNodesV2(cCtx *cli.Context) error {
 
 	go db.TableStatsMetricsDaemon(5 * time.Minute)
 	go db.BackupDaemon(backupFilenameFlag.Get(cCtx))
+	go db.CleanerDaemon(15 * time.Minute)
 
 	nodeKey, err := readNodeKey(cCtx)
 	if err != nil {
