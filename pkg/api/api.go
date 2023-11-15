@@ -490,7 +490,7 @@ func (a *API) handleHelp(w http.ResponseWriter, r *http.Request) {
 func allFiles(dirName string) ([]fs.FileInfo, error) {
 	dir, err := os.ReadDir(dirName)
 	if err != nil {
-		return nil, fmt.Errorf("reading dir: %s failed: %w", dir, err)
+		return nil, fmt.Errorf("reading dir: %s failed: %w", dirName, err)
 	}
 
 	files := []fs.FileInfo{}
