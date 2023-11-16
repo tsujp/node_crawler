@@ -135,9 +135,29 @@ templ NodeTable(nt database.NodeTable) {
 	</div>
 }
 
+func ByteCountIEC(b int64) string {
+	const unit = int64(1024)
+
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+
+	div, exp := unit, 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+
+	return fmt.Sprintf(
+		"%.1f %ciB",
+		float64(b)/float64(div),
+		"KMGTPE"[exp],
+	)
+}
+
 templ BackupsList(files []fs.FileInfo) {
 	<div style="margin: 1em;">
-		<h3>Backups</h3>
+		<h3>SQLite3 Backups</h3>
 		<table style="max-width=100%">
 			<thead>
 				<tr>
@@ -154,7 +174,7 @@ templ BackupsList(files []fs.FileInfo) {
 								{ file.Name() }
 							</a>
 						</td>
-						<td>{ strconv.FormatInt(file.Size(), 10) }</td>
+						<td title={ strconv.FormatInt(file.Size(), 10) }>{ ByteCountIEC(file.Size()) }</td>
 						<td>{ file.ModTime().Format(time.DateTime) }</td>
 					</tr>
 				}
@@ -182,7 +202,6 @@ templ HelpPage(enode string) {
 			<code>
 				docker exec CONTAINER_NAME geth --exec "admin.addPeer('{ enode }')" attach /ethclient/geth/geth.ipc
 			</code>
-
 			<h3>Find your node ID</h3>
 			<span>Find your node ID so you can find your node on the website</span>
 			<h4>Geth</h4>
@@ -199,7 +218,6 @@ templ HelpPage(enode string) {
 				docker exec CONTAINER_NAME geth --exec "admin.nodeInfo.id" attach /ethclient/geth/geth.ipc
 			</code>
 		</div>
-
 	</div>
 }
 
@@ -216,20 +234,17 @@ templ NodeList(nodes database.NodeList) {
 			<h3>Nodes</h3>
 			@NetworkFilterLinks(fmt.Sprintf("/nodes/?network=%%d&page=%d&synced=%d&q=%s", nodes.PageNumber, nodes.Synced, nodes.Query), nodes.NetworkFilter)
 			@SyncedFilterLinks(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%%d&q=%s", nodes.NetworkFilter, nodes.PageNumber, nodes.Query), nodes.Synced)
-
 			<form action="/nodes" method="get">
-				<input name="network" type="hidden" value={ strconv.FormatInt(nodes.NetworkFilter, 10) } />
-				<input name="page" type="hidden" value={ strconv.Itoa(nodes.PageNumber) } />
-				<input name="synced" type="hidden" value={ strconv.Itoa(nodes.Synced) } />
-
-				<input class={ pageButton(), pageButtonActive() } name="q" type="text" placeholder="Search IP or Node ID" value={ nodes.Query } />
-				<input class={ pageButton(), pageButtonActive() } type="submit" value="Search" />
+				<input name="network" type="hidden" value={ strconv.FormatInt(nodes.NetworkFilter, 10) }/>
+				<input name="page" type="hidden" value={ strconv.Itoa(nodes.PageNumber) }/>
+				<input name="synced" type="hidden" value={ strconv.Itoa(nodes.Synced) }/>
+				<input class={ pageButton(), pageButtonActive() } name="q" type="text" placeholder="Search IP or Node ID" value={ nodes.Query }/>
+				<input class={ pageButton(), pageButtonActive() } type="submit" value="Search"/>
 			</form>
-
 			<div style="display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.5em;">
 				<a
-					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", nodes.NetworkFilter, nodes.Synced)) }
-					class={
+ 					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", nodes.NetworkFilter, nodes.Synced)) }
+ 					class={
 						pageButton(),
 						templ.KV(pageButtonActive(), nodes.Query == ""),
 						templ.KV(pageButtonInactive(), nodes.Query != ""),
@@ -237,11 +252,10 @@ templ NodeList(nodes database.NodeList) {
 				>
 					All
 				</a>
-
 				for _, c := range []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"} {
 					<a
-						href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=%s", nodes.NetworkFilter, nodes.Synced, c)) }
-						class={
+ 						href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=%s", nodes.NetworkFilter, nodes.Synced, c)) }
+ 						class={
 							pageButton(),
 							templ.KV(pageButtonActive(), nodes.Query == c),
 							templ.KV(pageButtonInactive(), nodes.Query != c),
@@ -251,7 +265,6 @@ templ NodeList(nodes database.NodeList) {
 					</a>
 				}
 			</div>
-
 			<table style="width:100%">
 				<thead>
 					<tr>
@@ -288,15 +301,15 @@ templ NodeList(nodes database.NodeList) {
 			</table>
 			<div style="display:flex; flex-direction:row; justify-content:flex-end; align-items:center; gap:2em;">
 				<a
-					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", nodes.NetworkFilter, nodes.PageNumber-1, nodes.Synced, nodes.Query)) }
-					class={ pageButton(), pageButtonActive(), templ.KV(disabled(), nodes.PageNumber == 1) }
+ 					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", nodes.NetworkFilter, nodes.PageNumber-1, nodes.Synced, nodes.Query)) }
+ 					class={ pageButton(), pageButtonActive(), templ.KV(disabled(), nodes.PageNumber == 1) }
 				>
 					Previous
 				</a>
 				<span>{ strconv.Itoa(nodes.PageNumber) }</span>
 				<a
-					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", nodes.NetworkFilter, nodes.PageNumber+1, nodes.Synced, nodes.Query)) }
-					class={ pageButton(), pageButtonActive(), templ.KV(disabled(), !nodes.HasNextPage) }
+ 					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", nodes.NetworkFilter, nodes.PageNumber+1, nodes.Synced, nodes.Query)) }
+ 					class={ pageButton(), pageButtonActive(), templ.KV(disabled(), !nodes.HasNextPage) }
 				>
 					Next
 				</a>
@@ -332,80 +345,70 @@ templ HistoryList(history database.HistoryList) {
 				history.NetworkID,
 			)
 			<div style="display: flex; flex-direction: row; gap: 0.5em;">
-					<a
-						class={
-							pageButton(),
-							templ.KV(pageButtonActive(), history.IsError == -1),
-							templ.KV(pageButtonInactive(), history.IsError != -1),
-						}
-						href={
-							templ.URL(fmt.Sprintf(
+				<a
+ 					class={
+						pageButton(),
+						templ.KV(pageButtonActive(), history.IsError == -1),
+						templ.KV(pageButtonInactive(), history.IsError != -1),
+					}
+ 					href={ templ.URL(fmt.Sprintf(
 								"/history/?network=%d&before=%s&after=%s&error=-1",
 								history.NetworkID,
 								history.BeforeStr(),
 								history.AfterStr(),
-							))
-						}
-					>
-						All
-					</a>
-					<a
-						class={
-							pageButton(),
-							templ.KV(pageButtonActive(), history.IsError == 1),
-							templ.KV(pageButtonInactive(), history.IsError != 1),
-						}
-						href={
-							templ.URL(fmt.Sprintf(
+							)) }
+				>
+					All
+				</a>
+				<a
+ 					class={
+						pageButton(),
+						templ.KV(pageButtonActive(), history.IsError == 1),
+						templ.KV(pageButtonInactive(), history.IsError != 1),
+					}
+ 					href={ templ.URL(fmt.Sprintf(
 								"/history/?network=%d&before=%s&after=%s&error=1",
 								history.NetworkID,
 								history.BeforeStr(),
 								history.AfterStr(),
-							))
-						}
-					>
-						Error
-					</a>
-					<a
-						class={
-							pageButton(),
-							templ.KV(pageButtonActive(), history.IsError == 0),
-							templ.KV(pageButtonInactive(), history.IsError != 0),
-						}
-						href={
-							templ.URL(fmt.Sprintf(
+							)) }
+				>
+					Error
+				</a>
+				<a
+ 					class={
+						pageButton(),
+						templ.KV(pageButtonActive(), history.IsError == 0),
+						templ.KV(pageButtonInactive(), history.IsError != 0),
+					}
+ 					href={ templ.URL(fmt.Sprintf(
 								"/history/?network=%d&before=%s&after=%s&error=0",
 								history.NetworkID,
 								history.BeforeStr(),
 								history.AfterStr(),
-							))
-						}
-					>
-						Success
-					</a>
+							)) }
+				>
+					Success
+				</a>
 			</div>
 			<div style="display: flex; gap: 0.5em; align-items: center;">
 				<form style="display: flex; align-items: center; gap: 0.5em;" action="/history/" method="get">
-					<input name="network" type="hidden" value={ strconv.FormatInt(history.NetworkID, 10) } />
-
-					<input class={ pageButton(), pageButtonActive() } name="after" type="datetime-local" step="1" value={ history.FirstTimeStr() } /> UTC
-					<input class={ pageButton(), pageButtonActive() } title="Activate the flux capacitor" type="submit" value="Go to time" />
+					<input name="network" type="hidden" value={ strconv.FormatInt(history.NetworkID, 10) }/>
+					<input class={ pageButton(), pageButtonActive() } name="after" type="datetime-local" step="1" value={ history.FirstTimeStr() }/> UTC
+					<input class={ pageButton(), pageButtonActive() } title="Activate the flux capacitor" type="submit" value="Go to time"/>
 				</form>
 				<a
-					class={ pageButton(), pageButtonActive() }
-					href={
-						templ.URL(fmt.Sprintf(
+ 					class={ pageButton(), pageButtonActive() }
+ 					href={ templ.URL(fmt.Sprintf(
 							"/history/?network=%d&error=%d",
 							history.NetworkID,
 							history.IsError,
-						))
-					}
-					title="We have to go back"
+						)) }
+ 					title="We have to go back"
 				>
 					Go to now
 				</a>
 			</div>
-
 			<table style="width:100%">
 				<thead>
 					<tr>
@@ -435,14 +438,14 @@ templ HistoryList(history database.HistoryList) {
 				<div style="display:flex;flex-direction:row;align-items:center">
 					if history.FirstTime != nil && history.LastTime != nil {
 						<a
-							class={ pageButton(), pageButtonActive() }
-							href={templ.URL(fmt.Sprintf("/history/?network=%d&before=%s", history.NetworkID, history.FirstTimeStr()))}
+ 							class={ pageButton(), pageButtonActive() }
+ 							href={ templ.URL(fmt.Sprintf("/history/?network=%d&before=%s", history.NetworkID, history.FirstTimeStr())) }
 						>
 							Previous
 						</a>
 						<a
-							class={ pageButton(), pageButtonActive() }
-							href={templ.URL(fmt.Sprintf("/history/?network=%d&after=%s", history.NetworkID, history.LastTimeStr()))}
+ 							class={ pageButton(), pageButtonActive() }
+ 							href={ templ.URL(fmt.Sprintf("/history/?network=%d&after=%s", history.NetworkID, history.LastTimeStr())) }
 						>
 							Next
 						</a>
@@ -487,12 +490,12 @@ templ NetworkFilterLinks(hrefTemplate string, networkID int64) {
 	<div style="display: flex; flex-direction: row; gap: 0.5em;">
 		for _, netID := range []int64{-1, 1, 5, 17000, 11155111} {
 			<a
-				class={
+ 				class={
 					pageButton(),
 					templ.KV(pageButtonActive(), netID == networkID),
 					templ.KV(pageButtonInactive(), netID != networkID),
 				}
-				href={ templ.URL(fmt.Sprintf(hrefTemplate, netID)) }
+ 				href={ templ.URL(fmt.Sprintf(hrefTemplate, netID)) }
 			>
 				{ networkName(netID) }
 			</a>
@@ -502,36 +505,36 @@ templ NetworkFilterLinks(hrefTemplate string, networkID int64) {
 
 templ SyncedFilterLinks(hrefTemplate string, synced int) {
 	<div style="display: flex; flex-direction: row; gap: 0.5em;">
-			<a
-				class={
-					pageButton(),
-					templ.KV(pageButtonActive(), synced == -1),
-					templ.KV(pageButtonInactive(), synced != -1),
-				}
-				href={ templ.URL(fmt.Sprintf(hrefTemplate, -1)) }
-			>
-				All
-			</a>
-			<a
-				class={ 
-					pageButton(),
-					templ.KV(pageButtonActive(), synced == 1),
-					templ.KV(pageButtonInactive(), synced != 1),
-				 }
-				href={ templ.URL(fmt.Sprintf(hrefTemplate, 1)) }
-			>
-				Synced
-			</a>
-			<a
-				class={ 
-					pageButton(),
-					templ.KV(pageButtonActive(), synced == 0),
-					templ.KV(pageButtonInactive(), synced != 0),
-				 }
-				href={ templ.URL(fmt.Sprintf(hrefTemplate, 0)) }
-			>
-				Not Synced
-			</a>
+		<a
+ 			class={
+				pageButton(),
+				templ.KV(pageButtonActive(), synced == -1),
+				templ.KV(pageButtonInactive(), synced != -1),
+			}
+ 			href={ templ.URL(fmt.Sprintf(hrefTemplate, -1)) }
+		>
+			All
+		</a>
+		<a
+ 			class={
+				pageButton(),
+				templ.KV(pageButtonActive(), synced == 1),
+				templ.KV(pageButtonInactive(), synced != 1),
+			}
+ 			href={ templ.URL(fmt.Sprintf(hrefTemplate, 1)) }
+		>
+			Synced
+		</a>
+		<a
+ 			class={
+				pageButton(),
+				templ.KV(pageButtonActive(), synced == 0),
+				templ.KV(pageButtonInactive(), synced != 0),
+			}
+ 			href={ templ.URL(fmt.Sprintf(hrefTemplate, 0)) }
+		>
+			Not Synced
+		</a>
 	</div>
 }
 
@@ -539,7 +542,6 @@ templ Stats(networkID int64, synced int, stats ...templ.Component) {
 	<div style="display: flex; flex-direction: column; padding: 1em; gap: 1em;">
 		@NetworkFilterLinks(fmt.Sprintf("/?network=%%d&synced=%d", synced), networkID)
 		@SyncedFilterLinks(fmt.Sprintf("/?network=%d&synced=%%d", networkID), synced)
-		
 		<div style="display: flex; flex-direction: row; gap: 1em; flex-wrap: wrap;">
 			for _, stat := range stats {
 				{! stat }
@@ -553,11 +555,11 @@ templ StatsGroup(name string, stats database.CountTotal) {
 	<div style="display: flex; flex-direction: column; border: 1px solid orange; border-radius: 1em; padding: 1em; flex-grow: 1; min-width: 30%;">
 		<h2>{ name }</h2>
 		<div style="background-color: #333; padding: 0.5em 0; width: 100%;">
-				<span style="padding-inline-start: 0.5em; white-space: nowrap;">Total ({ strconv.Itoa(stats.Total) })</span>
+			<span style="padding-inline-start: 0.5em; white-space: nowrap;">Total ({ strconv.Itoa(stats.Total) })</span>
 		</div>
 		for _, stat := range stats.Values {
-			<div STYLE_REPLACE={fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", stat.Count * 100 / stats.Total)}>
-					<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ stat.Key } ({ strconv.Itoa(stat.Count) })</span>
+			<div STYLE_REPLACE={ fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", stat.Count*100/stats.Total) }>
+				<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ stat.Key } ({ strconv.Itoa(stat.Count) })</span>
 			</div>
 		}
 	</div>
