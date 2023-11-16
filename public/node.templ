@@ -641,6 +641,7 @@ templ Index(main templ.Component, networkID int64, synced int) {
 					<li><a href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", networkID, synced)) }>Nodes</a></li>
 					<li><a href={ templ.URL(fmt.Sprintf("/history/?network=%d", networkID)) }>Crawl History</a></li>
 					<li><a href="/help">Help</a></li>
+					<li><a href="/backups/">Backups</a></li>
 				</ul>
 			</nav>
 			<main>
