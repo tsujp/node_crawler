@@ -500,7 +500,7 @@ func allFiles(dirName string) ([]fs.FileInfo, error) {
 		}
 
 		// Not a complete backup
-		if !strings.HasSuffix(file.Name(), ".sz") {
+		if !strings.HasSuffix(file.Name(), ".gz") {
 			continue
 		}
 

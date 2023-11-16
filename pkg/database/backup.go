@@ -1,6 +1,7 @@
 package database
 
 import (
+	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/golang/snappy"
 )
 
 func today() time.Time {
@@ -43,7 +43,7 @@ func (db *DB) backup(backupFilename string) {
 	defer backupFile.Close()
 
 	tmpExtension := ".tmp"
-	compressedTmpName := backupName + ".sz" + tmpExtension
+	compressedTmpName := backupName + ".gz" + tmpExtension
 
 	compressedFile, err := os.OpenFile(
 		compressedTmpName,
@@ -57,7 +57,7 @@ func (db *DB) backup(backupFilename string) {
 	}
 	defer compressedFile.Close()
 
-	writer := snappy.NewBufferedWriter(compressedFile)
+	writer := gzip.NewWriter(compressedFile)
 
 	log.Info("Backup compress starting", "name", backupName)
 
