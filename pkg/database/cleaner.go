@@ -40,14 +40,9 @@ func (db *DB) blocksCleaner(ctx context.Context) {
 
 	_, err = db.db.ExecContext(ctx, `
 		DELETE FROM blocks
-		WHERE block_hash IN (
-			SELECT block_hash
-			FROM blocks
-			LEFT JOIN crawled_nodes crawled
-				ON (blocks.block_hash = crawled.head_hash)
-			WHERE crawled.node_id IS NULL
-			LIMIT 1000
-		)
+		LEFT JOIN crawled_nodes crawled
+			ON (blocks.block_hash = crawled.head_hash)
+		WHERE crawled.node_id IS NULL
 	`)
 	if err != nil {
 		log.Error("blocks cleaner failed", "err", err)
