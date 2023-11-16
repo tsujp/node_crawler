@@ -61,7 +61,7 @@
             src = gitignoreSource ./.;
             subPackages = [ "cmd/crawler" ];
 
-            vendorHash = "sha256-8SdW5VdQxQQl9hVDS+MGGA/qWSd+GVdGkw17WIebcs8=";
+            vendorHash = "sha256-erniYtrHpHqe2Q3uNS2HZxmFn/2ThPJ5Iljw2nj9zAc=";
 
             doCheck = false;
 
@@ -95,13 +95,20 @@
         devshells.default = {
           commands = [
             {
+              name = "go-mod-vendor-hash";
+              help = "Gets the vendor hash for the go modules";
+              command = ''
+                nix-prefetch --option extra-experimental-features flakes --silent \
+                  '{ sha256 }: (builtins.getFlake (toString ./.)).packages.x86_64-linux.nodeCrawler.goModules.overrideAttrs (_: { vendorSha256 = sha256; })'
+              '';
+            }
+            {
               name = "go-mod-upgrade";
               help = "Upgrades the go dependencies. Prints the new vendorHash.";
               command = ''
                 go get -u ./... && \
                 go mod tidy && \
-                nix-prefetch --option extra-experimental-features flakes --silent \
-                  '{ sha256 }: (builtins.getFlake (toString ./.)).packages.x86_64-linux.nodeCrawler.goModules.overrideAttrs (_: { vendorSha256 = sha256; })'
+                go-mod-vendor-hash
               '';
             }
           ];
