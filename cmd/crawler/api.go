@@ -51,7 +51,7 @@ func startAPI(cCtx *cli.Context) error {
 		database.NewAPIDB(db),
 		statsUpdateFrequencyFlag.Get(cCtx),
 		enodeFlag.Get(cCtx),
-		path.Base(backupFilenameFlag.Get(cCtx)),
+		path.Dir(backupFilenameFlag.Get(cCtx)),
 	)
 	go api.StartServer(
 		wg,
