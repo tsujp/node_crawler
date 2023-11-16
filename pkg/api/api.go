@@ -513,15 +513,7 @@ func allFiles(dirName string) ([]fs.FileInfo, error) {
 	}
 
 	slices.SortStableFunc(files, func(a, b fs.FileInfo) int {
-		if a.ModTime().Before(b.ModTime()) {
-			return 1
-		}
-
-		if a.ModTime().Equal(b.ModTime()) {
-			return 0
-		}
-
-		return -1
+		return strings.Compare(b.Name(), a.Name())
 	})
 
 	return files, nil
