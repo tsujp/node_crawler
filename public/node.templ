@@ -155,9 +155,9 @@ func ByteCountIEC(b int64) string {
 	)
 }
 
-templ BackupsList(files []fs.FileInfo) {
+templ SnapshotsList(files []fs.FileInfo) {
 	<div style="margin: 1em;">
-		<h3>SQLite3 Backups</h3>
+		<h3>SQLite3 Snapshots</h3>
 		<table style="max-width=100%">
 			<thead>
 				<tr>
@@ -170,7 +170,7 @@ templ BackupsList(files []fs.FileInfo) {
 				for _, file := range files {
 					<tr>
 						<td>
-							<a href={ templ.URL(fmt.Sprintf("/backups/%s", file.Name())) }>
+							<a href={ templ.URL(fmt.Sprintf("/snapshots/%s", file.Name())) }>
 								{ file.Name() }
 							</a>
 						</td>
@@ -643,7 +643,7 @@ templ Index(main templ.Component, networkID int64, synced int) {
 					<li><a href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", networkID, synced)) }>Nodes</a></li>
 					<li><a href={ templ.URL(fmt.Sprintf("/history/?network=%d", networkID)) }>Crawl History</a></li>
 					<li><a href="/help">Help</a></li>
-					<li><a href="/backups/">Backups</a></li>
+					<li><a href="/snapshots/">Snapshots</a></li>
 				</ul>
 			</nav>
 			<main>

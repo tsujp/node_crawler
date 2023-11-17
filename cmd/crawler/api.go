@@ -22,7 +22,7 @@ var (
 		Action: startAPI,
 		Flags: []cli.Flag{
 			&apiListenAddrFlag,
-			&backupFilenameFlag,
+			&snapshotFilenameFlag,
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
 			&dropNodesTimeFlag,
@@ -51,7 +51,7 @@ func startAPI(cCtx *cli.Context) error {
 		database.NewAPIDB(db),
 		statsUpdateFrequencyFlag.Get(cCtx),
 		enodeFlag.Get(cCtx),
-		path.Dir(backupFilenameFlag.Get(cCtx)),
+		path.Dir(snapshotFilenameFlag.Get(cCtx)),
 	)
 	go api.StartServer(
 		wg,

@@ -24,7 +24,7 @@ type API struct {
 	db                   *database.DB
 	statsUpdateFrequency time.Duration
 	enode                string
-	backupDir            string
+	snapshotDir          string
 
 	stats     database.AllStats
 	statsLock sync.Mutex
@@ -34,13 +34,13 @@ func New(
 	db *database.DB,
 	statsUpdateFrequency time.Duration,
 	enode string,
-	backupDir string,
+	snapshotDir string,
 ) *API {
 	api := &API{
 		db:                   db,
 		statsUpdateFrequency: statsUpdateFrequency,
 		enode:                enode,
-		backupDir:            backupDir,
+		snapshotDir:          snapshotDir,
 
 		stats: database.AllStats{},
 	}
@@ -499,7 +499,7 @@ func allFiles(dirName string) ([]fs.FileInfo, error) {
 			continue
 		}
 
-		// Not a complete backup
+		// Not a complete snapshot
 		if !strings.HasSuffix(file.Name(), ".gz") {
 			continue
 		}
@@ -519,10 +519,10 @@ func allFiles(dirName string) ([]fs.FileInfo, error) {
 	return files, nil
 }
 
-func (a *API) handleBackupsList(w http.ResponseWriter, r *http.Request) {
-	files, err := allFiles(a.backupDir)
+func (a *API) handleSnapshotsList(w http.ResponseWriter, r *http.Request) {
+	files, err := allFiles(a.snapshotDir)
 	if err != nil {
-		log.Error("listing backups failed", "err", err)
+		log.Error("listing snapshots failed", "err", err)
 
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, "Internal Server Error\n")
@@ -530,25 +530,25 @@ func (a *API) handleBackupsList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	backupList := public.BackupsList(files)
+	snapshotList := public.SnapshotsList(files)
 
-	index := public.Index(backupList, 1, 1)
+	index := public.Index(snapshotList, 1, 1)
 	_ = index.Render(r.Context(), w)
 }
 
-func (a *API) handleBackups(w http.ResponseWriter, r *http.Request) {
+func (a *API) handleSnapshots(w http.ResponseWriter, r *http.Request) {
 	urlPath := r.URL.Path
 
 	split := strings.Split(strings.Trim(urlPath, "/"), "/")
 
 	if len(split) == 1 {
-		a.handleBackupsList(w, r)
+		a.handleSnapshotsList(w, r)
 
 		return
 	}
 
 	if len(split) == 2 {
-		fileServer := http.FileServer(http.Dir(a.backupDir))
+		fileServer := http.FileServer(http.Dir(a.snapshotDir))
 
 		rCopy := r.Clone(r.Context())
 		rCopy.URL.Path = split[1]
@@ -568,7 +568,7 @@ func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 
 	router.HandleFunc("/", a.handleRoot)
 	router.HandleFunc("/favicon.ico", handleFavicon)
-	router.HandleFunc("/backups/", a.handleBackups)
+	router.HandleFunc("/snapshots/", a.handleSnapshots)
 	router.HandleFunc("/help/", a.handleHelp)
 	router.HandleFunc("/history/", a.handleHistoryList)
 	router.HandleFunc("/nodes/", a.nodesHandler)

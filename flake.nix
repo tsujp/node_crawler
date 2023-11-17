@@ -165,10 +165,10 @@
               description = "Name of the file within the `stateDir` for storing the data for the crawler.";
             };
 
-            backupFilename = mkOption {
+            snapshotFilename = mkOption {
               type = types.str;
-              default = "backups/crawler_20060102150405.db";
-              description = "Daily backup filename.";
+              default = "snapshots/crawler_20060102150405.db";
+              description = "Daily snapshot filename.";
             };
 
             user = mkOption {
@@ -334,7 +334,7 @@
                   ExecStart =
                   let
                     args = [
-                      "--backup-name=${cfg.backupFilename}"
+                      "--snapshot-name=${cfg.snapshotFilename}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
                       "--geoipdb=${cfg.crawler.geoipdb}"
                       "--metrics-addr=${cfg.crawler.metricsAddress}"
@@ -371,7 +371,7 @@
                   let
                     args = [
                       "--api-addr=${apiAddress}"
-                      "--backup-name=${cfg.backupFilename}"
+                      "--snapshot-name=${cfg.snapshotFilename}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
                       "--enode=${cfg.api.enode}"
                       "--metrics-addr=${cfg.api.metricsAddress}"
