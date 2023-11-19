@@ -20,6 +20,7 @@ npm-debug.log*
 /data/
 /backups/
 /*.db
+/*.db.gz
 /*.db-*
 node-crawler-backend
 node-crawler-backend.exe

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS crawled_nodes (
 	client_build		TEXT	DEFAULT NULL,
 	client_os			TEXT	DEFAULT NULL,
 	client_arch			TEXT	DEFAULT NULL,
-	client_language		TEXT	DEAFULT NULL,
+	client_language		TEXT	DEFAULT NULL,
 	rlpx_version		INTEGER	DEFAULT NULL,
 	capabilities		TEXT	DEFAULT NULL,
 	network_id			INTEGER	DEFAULT NULL,
@@ -72,3 +72,22 @@ CREATE TABLE IF NOT EXISTS blocks (
 
 CREATE INDEX IF NOT EXISTS blocks_block_hash_timestamp
 	ON blocks (block_hash, timestamp);
+
+CREATE SCHEMA IF NOT EXISTS stats;
+
+CREATE TABLE IF NOT EXISTS stats.crawled_nodes (
+	timestamp		INTEGER	NOT NULL,
+	client_name		TEXT	NOT NULL,
+	client_version	TEXT	NOT NULL,
+	client_os		TEXT	NOT NULL,
+	client_arch		TEXT	NOT NULL,
+	network_id		INTEGER	NOT NULL,
+	fork_id			INTEGER	NOT NULL,
+	next_fork_id	INTEGER	NOT NULL,
+	synced			INTEGER	NOT NULL,
+	country			TEXT	NOT NULL,
+	total			INTEGER NOT NULL,
+) STRICT;
+
+CREATE INDEX stats_crawled_nodes_timestamp
+	ON stats.crawled_nodes (timestamp);

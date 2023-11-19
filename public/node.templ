@@ -16,8 +16,36 @@ templ NodeTable(nt database.NodeTable) {
 					<td>{ nt.NodeID() }</td>
 				</tr>
 				<tr>
+					<td>Client Identifier</td>
+					<td>{ database.StringOrEmpty(nt.ClientID) }</td>
+				</tr>
+				<tr>
 					<td>Client Name</td>
 					<td>{ database.StringOrEmpty(nt.ClientName) }</td>
+				</tr>
+				<tr>
+					<td>Client User Data</td>
+					<td>{ database.StringOrEmpty(nt.ClientUserData) }</td>
+				</tr>
+				<tr>
+					<td>Client Version</td>
+					<td>{ database.StringOrEmpty(nt.ClientVersion) }</td>
+				</tr>
+				<tr>
+					<td>Client Build</td>
+					<td>{ database.StringOrEmpty(nt.ClientBuild) }</td>
+				</tr>
+				<tr>
+					<td>Client OS</td>
+					<td>{ database.StringOrEmpty(nt.ClientOS) }</td>
+				</tr>
+				<tr>
+					<td>Client Arch</td>
+					<td>{ database.StringOrEmpty(nt.ClientArch) }</td>
+				</tr>
+				<tr>
+					<td>Client Language</td>
+					<td>{ database.StringOrEmpty(nt.ClientLanguage) }</td>
 				</tr>
 				<tr>
 					<td>Last Found (Discovery)</td>
@@ -270,6 +298,10 @@ templ NodeList(nodes database.NodeList) {
 					<tr>
 						<td>Node ID</td>
 						<td>Client Name</td>
+						<td>Client Version</td>
+						<td>Client Build</td>
+						<td>Client OS</td>
+						<td>Client Arch</td>
 						<td>Last Update</td>
 						<td>Country</td>
 						<td>Is Synced</td>
@@ -279,21 +311,17 @@ templ NodeList(nodes database.NodeList) {
 					for _, row := range nodes.List {
 						<tr>
 							<td><a href={ templ.URL("/nodes/" + row.NodeID()) }>{ row.NodeID()[:8] }</a></td>
-							if row.ClientName != nil {
-								<td>{ *row.ClientName }</td>
-							} else {
-								<td></td>
-							}
+							<td>{ database.StringOrEmpty(row.ClientName) }</td>
+							<td>{ database.StringOrEmpty(row.ClientVersion) }</td>
+							<td>{ database.StringOrEmpty(row.ClientBuild) }</td>
+							<td>{ database.StringOrEmpty(row.ClientOS) }</td>
+							<td>{ database.StringOrEmpty(row.ClientArch) }</td>
 							if row.UpdatedAt != nil {
 								<td title={ row.UpdatedAt.UTC().Format(database.DateFormat) }>{ row.SinceUpdate() }</td>
 							} else {
 								<td></td>
 							}
-							if row.Country != nil {
-								<td>{ *row.Country }</td>
-							} else {
-								<td></td>
-							}
+							<td>{ database.StringOrEmpty(row.Country) }</td>
 							<td>{ row.IsSynced() }</td>
 						</tr>
 					}

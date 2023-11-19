@@ -199,33 +199,40 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				latitude,
 				longitude
 			) VALUES (
-				?1,					-- node_id
-				unixepoch(),		-- updated_at
-				nullif(?2, ''),		-- client_identifier
-				nullif(?3, ''),		-- client_name,
-				nullif(?4, ''),		-- client_user_data,
-				nullif(?5, ''),		-- client_version,
-				nullif(?6, ''),		-- client_build,
-				nullif(?7, ''),		-- client_os,
-				nullif(?8, ''),		-- client_arch,
-				nullif(?9, ''),		-- client_language,
-				nullif(?10, 0),		-- rlpx_version
-				nullif(?11, ''),	-- capabilities
-				nullif(?12, 0),		-- network_id
-				nullif(?13, 0),		-- fork_id
-				nullif(?14, 0),		-- next_fork_id
-				nullif(?15, X''),	-- head_hash
-				nullif(?16, ''),	-- ip_address
-				nullif(?17, ''),	-- connection_type
-				nullif(?18, ''),	-- country
-				nullif(?19, ''),	-- city
-				nullif(?20, 0.0),	-- latitude
-				nullif(?21, 0.0)	-- longitude
+				?1,						-- node_id
+				unixepoch(),			-- updated_at
+				nullif(?2, ''),			-- client_identifier
+				nullif(?3, 'Unknown'),	-- client_name,
+				nullif(?4, 'Unknown'),	-- client_user_data,
+				nullif(?5, 'Unknown'),	-- client_version,
+				nullif(?6, 'Unknown'),	-- client_build,
+				nullif(?7, 'Unknown'),	-- client_os,
+				nullif(?8, 'Unknown'),	-- client_arch,
+				nullif(?9, 'Unknown'),	-- client_language,
+				nullif(?10, 0),			-- rlpx_version
+				nullif(?11, ''),		-- capabilities
+				nullif(?12, 0),			-- network_id
+				nullif(?13, 0),			-- fork_id
+				nullif(?14, 0),			-- next_fork_id
+				nullif(?15, X''),		-- head_hash
+				nullif(?16, ''),		-- ip_address
+				nullif(?17, ''),		-- connection_type
+				nullif(?18, ''),		-- country
+				nullif(?19, ''),		-- city
+				nullif(?20, 0.0),		-- latitude
+				nullif(?21, 0.0)		-- longitude
 			)
 			ON CONFLICT (node_id) DO UPDATE
 			SET
 				updated_at = unixepoch(),
+				client_identifier = coalesce(excluded.client_identifier, client_identifier),
 				client_name = coalesce(excluded.client_name, client_name),
+				client_user_data = coalesce(excluded.client_user_data, client_user_data),
+				client_version = coalesce(excluded.client_version, client_version),
+				client_build = coalesce(excluded.client_build, client_build),
+				client_os = coalesce(excluded.client_os, client_os),
+				client_arch = coalesce(excluded.client_arch, client_arch),
+				client_language = coalesce(excluded.client_language, client_language),
 				rlpx_version = coalesce(excluded.rlpx_version, rlpx_version),
 				capabilities = coalesce(excluded.capabilities, capabilities),
 				network_id = coalesce(excluded.network_id, network_id),

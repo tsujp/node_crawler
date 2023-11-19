@@ -75,13 +75,13 @@ func (db *DB) migrateCrawledNodes() error {
 			?,
 			?,
 			?,
-			nullif(?, ''),
-			nullif(?, ''),
-			nullif(?, ''),
-			nullif(?, ''),
-			nullif(?, ''),
-			nullif(?, ''),
-			nullif(?, ''),
+			nullif(?, 'Unknown'),
+			nullif(?, 'Unknown'),
+			nullif(?, 'Unknown'),
+			nullif(?, 'Unknown'),
+			nullif(?, 'Unknown'),
+			nullif(?, 'Unknown'),
+			nullif(?, 'Unknown'),
 			?,
 			?,
 			?,
@@ -129,7 +129,9 @@ func (db *DB) migrateCrawledNodes() error {
 
 		clientPtr := parseClientID(clientID)
 		if clientPtr == nil {
-			log.Error("parsing client id failed", "id", clientID)
+			if clientID != nil {
+				log.Error("parsing client id failed", "id", *clientID)
+			}
 		}
 
 		client := clientPtr.Deref()

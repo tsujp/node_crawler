@@ -269,8 +269,8 @@ func (db *DB) GetNodeList(
 				disc.node_id,
 				crawled.updated_at,
 				crawled.client_name,
-				crawled.client_user_data,
 				crawled.client_version,
+				crawled.client_build,
 				crawled.client_os,
 				crawled.client_arch,
 				crawled.country,
@@ -313,7 +313,7 @@ func (db *DB) GetNodeList(
 				)
 				AND (  -- Client Name filter
 					?6 = ''
-					OR node.client_name = ?6
+					OR crawled.client_name = ?6
 				)
 			ORDER BY disc.node_id
 			LIMIT ?7 + 1
@@ -364,8 +364,8 @@ func (db *DB) GetNodeList(
 			&row.nodeID,
 			&updatedAtInt,
 			&row.ClientName,
-			&row.ClientUserData,
 			&row.ClientVersion,
+			&row.ClientBuild,
 			&row.ClientOS,
 			&row.ClientArch,
 			&row.Country,
@@ -399,6 +399,10 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 		`
 			SELECT
 				crawled.client_name,
+				crawled.client_user_data,
+				crawled.client_version,
+				crawled.client_os,
+				crawled.client_arch,
 				crawled.network_id,
 				crawled.fork_id,
 				crawled.next_fork_id,
@@ -413,7 +417,9 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 				crawled.head_hash = blocks.block_hash
 				AND crawled.network_id = blocks.network_id
 			)
-			WHERE disc.last_found > unixepoch('now', '-24 hours')
+			WHERE
+				disc.last_found > unixepoch('now', '-24 hours')
+				AND crawled.client_identifier IS NOT NULL
 		`,
 	)
 	if err != nil {
@@ -425,11 +431,15 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 
 	for rows.Next() {
 		stats := Stats{}
-		var name *string
+		var clientName, clientUserData, clientVersion, clientOS, clientArch *string
 		var updatedAtInt, blockTimestampInt *int64
 
 		err := rows.Scan(
-			&name,
+			&clientName,
+			&clientUserData,
+			&clientVersion,
+			&clientOS,
+			&clientArch,
 			&stats.NetworkID,
 			&stats.ForkID,
 			&stats.NextForkID,
@@ -444,12 +454,17 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 		updatedAt := int64PrtToTimePtr(updatedAtInt)
 		blockTimestamp := int64PrtToTimePtr(blockTimestampInt)
 
-		client := parseClientID(name)
-		if client != nil {
-			stats.Synced = isSynced(updatedAt, blockTimestamp)
-			stats.Client = *client
-			allStats = append(allStats, stats)
-		}
+		stats.Synced = isSynced(updatedAt, blockTimestamp)
+		stats.Client = New(
+			clientName,
+			clientUserData,
+			clientVersion,
+			nil,
+			clientOS,
+			clientArch,
+			nil,
+		)
+		allStats = append(allStats, stats)
 	}
 
 	return AllStats(allStats), nil

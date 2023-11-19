@@ -29,9 +29,45 @@ type Client struct {
 	Language string
 }
 
+func strOrUnknown(s *string) string {
+	if s == nil {
+		return Unknown
+	}
+
+	return *s
+}
+
+func New(
+	name *string,
+	userData *string,
+	version *string,
+	build *string,
+	os *string,
+	arch *string,
+	language *string,
+) Client {
+	return Client{
+		Name:     strOrUnknown(name),
+		UserData: strOrUnknown(userData),
+		Version:  strOrUnknown(version),
+		Build:    strOrUnknown(build),
+		OS:       strOrUnknown(os),
+		Arch:     strOrUnknown(arch),
+		Language: strOrUnknown(language),
+	}
+}
+
 func (c *Client) Deref() Client {
 	if c == nil {
-		return Client{}
+		return Client{
+			Name:     Unknown,
+			UserData: Unknown,
+			Version:  Unknown,
+			Build:    Unknown,
+			OS:       Unknown,
+			Arch:     Unknown,
+			Language: Unknown,
+		}
 	}
 
 	return *c
@@ -198,6 +234,18 @@ func handleNimbus(name string) (*Client, error) {
 
 	parts := strings.Split(string(newClientName), " ")
 
+	if len(parts) == 1 {
+		return &Client{
+			Name:     parts[0],
+			UserData: Unknown,
+			Version:  Unknown,
+			Build:    Unknown,
+			OS:       Unknown,
+			Arch:     Unknown,
+			Language: Unknown,
+		}, nil
+	}
+
 	if len(parts) != 7 {
 		return nil, fmt.Errorf("nimbus-eth1 not valid, name: %s", name)
 	}
@@ -214,6 +262,7 @@ func handleNimbus(name string) (*Client, error) {
 
 	return &Client{
 		Name:     parts[0],
+		UserData: Unknown,
 		Version:  version.Version(),
 		Build:    parts[6],
 		OS:       os,
@@ -225,6 +274,7 @@ func handleNimbus(name string) (*Client, error) {
 func handleLen1(parts []string) (*Client, error) {
 	return &Client{
 		Name:     parts[0],
+		UserData: Unknown,
 		Version:  Unknown,
 		Build:    Unknown,
 		OS:       Unknown,
@@ -241,6 +291,7 @@ func handleLen2(parts []string) (*Client, error) {
 
 	return &Client{
 		Name:     parts[0],
+		UserData: Unknown,
 		Version:  version.Version(),
 		Build:    version.Build,
 		OS:       Unknown,
@@ -292,6 +343,7 @@ func handleLen4(parts []string) (*Client, error) {
 
 	return &Client{
 		Name:     parts[0],
+		UserData: Unknown,
 		Version:  version.Version(),
 		Build:    version.Build,
 		OS:       os,
@@ -321,6 +373,7 @@ func handleLen5(parts []string) (*Client, error) {
 
 	return &Client{
 		Name:     parts[0],
+		UserData: Unknown,
 		Version:  version.Version(),
 		Build:    version.Build,
 		OS:       os,
@@ -343,6 +396,7 @@ func handleLen6(parts []string) (*Client, error) {
 
 	return &Client{
 		Name:     parts[0],
+		UserData: Unknown,
 		Version:  version.Version(),
 		Build:    version.Build,
 		OS:       os,
@@ -403,7 +457,11 @@ func parseClientID(clientName *string) *Client {
 	}
 
 	if strings.HasPrefix(name, "nimbus-eth1") {
-		client, _ := handleNimbus(name)
+		client, err := handleNimbus(name)
+		if err != nil {
+			log.Error("parse nimbus failed", "err", err, "name", name)
+		}
+
 		return client
 	}
 

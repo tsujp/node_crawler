@@ -18,8 +18,8 @@ type NodeListRow struct {
 	nodeID            []byte
 	UpdatedAt         *time.Time
 	ClientName        *string
-	ClientUserData    *string
 	ClientVersion     *string
+	ClientBuild       *string
 	ClientOS          *string
 	ClientArch        *string
 	Country           *string
