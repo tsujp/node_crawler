@@ -29,6 +29,14 @@ type Client struct {
 	Language string
 }
 
+func (c *Client) Deref() Client {
+	if c == nil {
+		return Client{}
+	}
+
+	return *c
+}
+
 func parseOSArch(osStr string) (string, string, error) {
 	if osStr == "" {
 		return Unknown, Unknown, ErrOSArchEmpty
@@ -379,7 +387,7 @@ var funcs = []func([]string) (*Client, error){
 	handleLen7,
 }
 
-func parseClientName(clientName *string) *Client {
+func parseClientID(clientName *string) *Client {
 	if clientName == nil {
 		return nil
 	}

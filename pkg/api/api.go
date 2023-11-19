@@ -165,10 +165,13 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	redirectURL := r.URL
 	redirect := false
 
-	pageNumStr := r.URL.Query().Get("page")
-	networkIDStr := r.URL.Query().Get("network")
-	syncedStr := r.URL.Query().Get("synced")
-	query = r.URL.Query().Get("q")
+	urlQuery := r.URL.Query()
+
+	pageNumStr := urlQuery.Get("page")
+	networkIDStr := urlQuery.Get("network")
+	syncedStr := urlQuery.Get("synced")
+	query = urlQuery.Get("q")
+	clientName := urlQuery.Get("client_name")
 
 	// This is a full node ID, just redirect to the node's page
 	if len(query) == 64 {
@@ -247,6 +250,7 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		networkID,
 		synced,
 		*nodeListQuery,
+		clientName,
 	)
 	if err != nil {
 		log.Error("get node list failed", "err", err, "pageNumber", pageNumber)

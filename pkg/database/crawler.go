@@ -166,12 +166,26 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 		}
 	}
 
+	clientPtr := parseClientID(&node.Info.ClientName)
+	if clientPtr == nil {
+		log.Error("parsing client ID failed", "id", node.Info.ClientName)
+	}
+
+	client := clientPtr.Deref()
+
 	_, err = db.ExecRetryBusy(
 		`
 			INSERT INTO crawled_nodes (
 				node_id,
 				updated_at,
+				client_identifier,
 				client_name,
+				client_user_data,
+				client_version,
+				client_build,
+				client_os,
+				client_arch,
+				client_language,
 				rlpx_version,
 				capabilities,
 				network_id,
@@ -187,19 +201,26 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 			) VALUES (
 				?1,					-- node_id
 				unixepoch(),		-- updated_at
-				nullif(?2, ''),		-- client_name
-				nullif(?3, 0),		-- rlpx_version
-				nullif(?4, ''),		-- capabilities
-				nullif(?5, 0),		-- network_id
-				nullif(?6, 0),		-- fork_id
-				nullif(?7, 0),		-- next_fork_id
-				nullif(?8, X''),	-- head_hash
-				nullif(?9, ''),		-- ip_address
-				nullif(?10, ''),	-- connection_type
-				nullif(?11, ''),	-- country
-				nullif(?12, ''),	-- city
-				nullif(?13, 0.0),	-- latitude
-				nullif(?14, 0.0)	-- longitude
+				nullif(?2, ''),		-- client_identifier
+				nullif(?3, ''),		-- client_name,
+				nullif(?4, ''),		-- client_user_data,
+				nullif(?5, ''),		-- client_version,
+				nullif(?6, ''),		-- client_build,
+				nullif(?7, ''),		-- client_os,
+				nullif(?8, ''),		-- client_arch,
+				nullif(?9, ''),		-- client_language,
+				nullif(?10, 0),		-- rlpx_version
+				nullif(?11, ''),	-- capabilities
+				nullif(?12, 0),		-- network_id
+				nullif(?13, 0),		-- fork_id
+				nullif(?14, 0),		-- next_fork_id
+				nullif(?15, X''),	-- head_hash
+				nullif(?16, ''),	-- ip_address
+				nullif(?17, ''),	-- connection_type
+				nullif(?18, ''),	-- country
+				nullif(?19, ''),	-- city
+				nullif(?20, 0.0),	-- latitude
+				nullif(?21, 0.0)	-- longitude
 			)
 			ON CONFLICT (node_id) DO UPDATE
 			SET
@@ -227,11 +248,11 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				next_crawl
 			) VALUES (
 				?1,
-				?15,
-				?9,
+				?22,
+				?16,
 				unixepoch(),
 				unixepoch(),
-				unixepoch() + ?17
+				unixepoch() + ?24
 			)
 			ON CONFLICT (node_id) DO UPDATE
 			SET
@@ -241,7 +262,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				-- want to try dialing because we want to see if the node is
 				-- exposed.
 				next_crawl = CASE
-					WHEN ?16 == 'dial'
+					WHEN ?23 == 'dial'
 						THEN excluded.next_crawl
 						ELSE next_crawl
 					END;
@@ -254,13 +275,20 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 			) VALUES (
 				?1,
 				unixepoch(),
-				?16,
+				?23,
 				NULL
 			)
 			ON CONFLICT (node_id, crawled_at) DO NOTHING;
 		`,
 		node.ID(),
 		info.ClientName,
+		client.Name,
+		client.UserData,
+		client.Version,
+		client.Build,
+		client.OS,
+		client.Arch,
+		client.Language,
 		info.RLPxVersion,
 		node.CapsString(),
 		info.NetworkID,

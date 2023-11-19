@@ -24,7 +24,14 @@ type NodeTable struct {
 	lastFound      time.Time
 	updatedAt      *time.Time
 	Enode          *string
+	ClientID       *string
 	ClientName     *string
+	ClientUserData *string
+	ClientVersion  *string
+	ClientBuild    *string
+	ClientOS       *string
+	ClientArch     *string
+	ClientLanguage *string
 	RlpxVersion    *int64
 	Capabilities   *string
 	networkID      *int64

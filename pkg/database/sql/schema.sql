@@ -15,21 +15,28 @@ CREATE INDEX IF NOT EXISTS discovered_nodes_ip_address_node_id
 	ON discovered_nodes (ip_address, node_id);
 
 CREATE TABLE IF NOT EXISTS crawled_nodes (
-	node_id			BLOB	PRIMARY KEY,
-	updated_at		INTEGER	NOT NULL,
-	client_name		TEXT	DEFAULT NULL,
-	rlpx_version	INTEGER	DEFAULT NULL,
-	capabilities	TEXT	DEFAULT NULL,
-	network_id		INTEGER	DEFAULT NULL,
-	fork_id			INTEGER	DEFAULT NULL,
-	next_fork_id	INTEGER	DEFAULT NULL,
-	head_hash		BLOB	DEFAULT NULL,
-	ip_address		TEXT	DEFAULT NULL,
-	connection_type	TEXT	DEFAULT NULL,
-	country			TEXT	DEFAULT NULL,
-	city			TEXT	DEFAULT NULL,
-	latitude		REAL	DEFAULT NULL,
-	longitude		REAL	DEFAULT NULL
+	node_id				BLOB	PRIMARY KEY,
+	updated_at			INTEGER	NOT NULL,
+	client_identifier	TEXT	DEFAULT NULL,
+	client_name			TEXT	DEFAULT NULL,
+	client_user_data	TEXT	DEFAULT NULL,
+	client_version		TEXT	DEFAULT NULL,
+	client_build		TEXT	DEFAULT NULL,
+	client_os			TEXT	DEFAULT NULL,
+	client_arch			TEXT	DEFAULT NULL,
+	client_language		TEXT	DEAFULT NULL,
+	rlpx_version		INTEGER	DEFAULT NULL,
+	capabilities		TEXT	DEFAULT NULL,
+	network_id			INTEGER	DEFAULT NULL,
+	fork_id				INTEGER	DEFAULT NULL,
+	next_fork_id		INTEGER	DEFAULT NULL,
+	head_hash			BLOB	DEFAULT NULL,
+	ip_address			TEXT	DEFAULT NULL,
+	connection_type		TEXT	DEFAULT NULL,
+	country				TEXT	DEFAULT NULL,
+	city				TEXT	DEFAULT NULL,
+	latitude			REAL	DEFAULT NULL,
+	longitude			REAL	DEFAULT NULL
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS crawled_nodes_node_id_last_seen
@@ -38,6 +45,8 @@ CREATE INDEX IF NOT EXISTS crawled_nodes_network_id
 	ON crawled_nodes (network_id);
 CREATE INDEX IF NOT EXISTS crawled_nodes_ip_address
 	ON crawled_nodes (ip_address);
+CREATE INDEX IF NOT EXISTS crawled_nodes_client_name
+	ON crawled_nodes (client_name);
 
 CREATE TABLE IF NOT EXISTS crawl_history (
 	node_id		BLOB	NOT NULL,

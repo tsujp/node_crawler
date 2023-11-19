@@ -18,6 +18,10 @@ type NodeListRow struct {
 	nodeID            []byte
 	UpdatedAt         *time.Time
 	ClientName        *string
+	ClientUserData    *string
+	ClientVersion     *string
+	ClientOS          *string
+	ClientArch        *string
 	Country           *string
 	HeadHashTimestamp *time.Time
 }
@@ -42,5 +46,7 @@ type NodeList struct {
 	Offset        int
 	NetworkFilter int64
 	Query         string
-	List          []NodeListRow
+	ClientName    string
+
+	List []NodeListRow
 }

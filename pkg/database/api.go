@@ -37,7 +37,14 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				disc.last_found,
 				crawled.updated_at,
 				network_address,
+				client_identifier,
 				client_name,
+				client_user_data,
+				client_version,
+				client_build,
+				client_os,
+				client_arch,
+				client_language,
 				rlpx_version,
 				capabilities,
 				crawled.network_id,
@@ -74,7 +81,14 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		&lastFound,
 		&updatedAtInt,
 		&nodePage.Enode,
+		&nodePage.ClientID,
 		&nodePage.ClientName,
+		&nodePage.ClientUserData,
+		&nodePage.ClientVersion,
+		&nodePage.ClientBuild,
+		&nodePage.ClientOS,
+		&nodePage.ClientArch,
+		&nodePage.ClientLanguage,
 		&nodePage.RlpxVersion,
 		&nodePage.Capabilities,
 		&nodePage.networkID,
@@ -233,6 +247,7 @@ func (db *DB) GetNodeList(
 	networkID int64,
 	synced int,
 	query NodeListQuery,
+	clientName string,
 ) (*NodeList, error) {
 	var err error
 
@@ -254,6 +269,10 @@ func (db *DB) GetNodeList(
 				disc.node_id,
 				crawled.updated_at,
 				crawled.client_name,
+				crawled.client_user_data,
+				crawled.client_version,
+				crawled.client_os,
+				crawled.client_arch,
 				crawled.country,
 				blocks.timestamp
 			FROM discovered_nodes AS disc
@@ -292,15 +311,20 @@ func (db *DB) GetNodeList(
 					?5 = ''
 					OR disc.ip_address = ?5
 				)
+				AND (  -- Client Name filter
+					?6 = ''
+					OR node.client_name = ?6
+				)
 			ORDER BY disc.node_id
-			LIMIT ?6 + 1
-			OFFSET ?7
+			LIMIT ?7 + 1
+			OFFSET ?8
 		`, hint),
 		networkID,
 		synced,
 		query.NodeIDStart,
 		query.NodeIDEnd,
 		query.IP,
+		clientName,
 		pageSize,
 		offset,
 	)
@@ -318,6 +342,7 @@ func (db *DB) GetNodeList(
 		List:          []NodeListRow{},
 		NetworkFilter: networkID,
 		Query:         query.Query,
+		ClientName:    clientName,
 	}
 
 	rowNumber := 0
@@ -339,6 +364,10 @@ func (db *DB) GetNodeList(
 			&row.nodeID,
 			&updatedAtInt,
 			&row.ClientName,
+			&row.ClientUserData,
+			&row.ClientVersion,
+			&row.ClientOS,
+			&row.ClientArch,
 			&row.Country,
 			&headHashTimeInt,
 		)
@@ -415,7 +444,7 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 		updatedAt := int64PrtToTimePtr(updatedAtInt)
 		blockTimestamp := int64PrtToTimePtr(blockTimestampInt)
 
-		client := parseClientName(name)
+		client := parseClientID(name)
 		if client != nil {
 			stats.Synced = isSynced(updatedAt, blockTimestamp)
 			stats.Client = *client
