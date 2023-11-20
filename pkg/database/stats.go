@@ -1,10 +1,130 @@
 package database
 
 import (
+	"context"
+	_ "embed"
+	"fmt"
 	"strings"
+	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/node-crawler/pkg/metrics"
 	"golang.org/x/exp/slices"
 )
+
+func (db *DB) AttachStatsDB(filename string) error {
+	statsConn, err := db.db.Conn(context.Background())
+	if err != nil {
+		return fmt.Errorf("getting connection failed: %w", err)
+	}
+
+	_, err = statsConn.ExecContext(
+		context.Background(),
+		fmt.Sprintf(`ATTACH DATABASE '%s' AS stats`, filename),
+	)
+	if err != nil {
+		return fmt.Errorf("exec failed: %w", err)
+	}
+
+	db.statsConn = statsConn
+
+	return nil
+}
+
+//go:embed sql/stats.sql
+var statsSchema string
+
+func (db *DB) CreateStatsTables() error {
+	_, err := db.statsConn.ExecContext(context.Background(), statsSchema)
+	if err != nil {
+		return fmt.Errorf("creating schema failed: %w", err)
+	}
+
+	return nil
+}
+
+// Meant to be run as a goroutine.
+//
+// Copies the stats into the stats table every `frequency` duration.
+func (db *DB) CopyStatsDaemon(frequency time.Duration) {
+	for {
+		start := time.Now()
+		nextRun := start.Truncate(frequency).Add(frequency)
+
+		err := db.CopyStats()
+		if err != nil {
+			log.Error("Copy stats failed", "err", err)
+		}
+
+		time.Sleep(time.Until(nextRun))
+	}
+}
+
+func (db *DB) CopyStats() error {
+	var err error
+
+	start := time.Now()
+	defer metrics.ObserveDBQuery("copy_stats", start, err)
+
+	_, err = db.statsConn.ExecContext(
+		context.Background(),
+		`
+			INSERT INTO stats.crawled_nodes
+		
+			SELECT
+				unixepoch() timestamp,
+				crawled.client_name,
+				crawled.client_version,
+				crawled.client_os,
+				crawled.client_arch,
+				crawled.network_id,
+				crawled.fork_id,
+				crawled.next_fork_id,
+				crawled.country,
+				CASE
+					WHEN blocks.timestamp IS NULL
+					THEN false
+					ELSE abs(crawled.updated_at - blocks.timestamp) < 60
+				END synced,
+				EXISTS (
+					SELECT 1
+					FROM crawl_history
+					WHERE
+						node_id = crawled.node_id
+						AND (
+							error IS NULL
+							OR error IN ('too many peers')
+						)
+				) dial_success,
+				COUNT(*) total
+			FROM crawled_nodes crawled
+			LEFT JOIN discovered_nodes disc ON (
+				crawled.node_id = disc.node_id
+			)
+			LEFT JOIN blocks ON (
+				crawled.head_hash = blocks.block_hash
+				AND crawled.network_id = blocks.network_id
+			)
+			WHERE
+				disc.last_found > unixepoch('now', '-24 hours')
+			GROUP BY
+				crawled.client_name,
+				crawled.client_version,
+				crawled.client_os,
+				crawled.client_arch,
+				crawled.network_id,
+				crawled.fork_id,
+				crawled.next_fork_id,
+				crawled.country,
+				synced
+		`,
+	)
+	if err != nil {
+		return fmt.Errorf("exec failed: %w", err)
+	}
+
+	return nil
+}
 
 type Stats struct {
 	Client     Client

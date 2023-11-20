@@ -18,6 +18,7 @@ linters:
     - misspell
     - unconvert
     - typecheck
+    - exhaustruct
 # this repo contains a few copied files from go-ethereum, 
 # and some of them have unused fields/functions
     #- unused

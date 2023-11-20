@@ -16,8 +16,9 @@ import (
 )
 
 type DB struct {
-	db      *sql.DB
-	geoipDB *geoip2.Reader
+	db        *sql.DB
+	statsConn *sql.Conn
+	geoipDB   *geoip2.Reader
 
 	nextCrawlSucces int64
 	nextCrawlFail   int64
@@ -38,8 +39,9 @@ func NewDB(
 	nextCrawlNotEth time.Duration,
 ) *DB {
 	return &DB{
-		db:      db,
-		geoipDB: geoipDB,
+		db:        db,
+		statsConn: nil,
+		geoipDB:   geoipDB,
 
 		nextCrawlSucces: int64(nextCrawlSucces.Seconds()),
 		nextCrawlFail:   int64(nextCrawlFail.Seconds()),
@@ -47,6 +49,14 @@ func NewDB(
 
 		wLock: sync.Mutex{},
 	}
+}
+
+func (db *DB) Close() error {
+	return db.db.Close()
+}
+
+func (db *DB) StatsConn() *sql.Conn {
+	return db.statsConn
 }
 
 func (db *DB) AnalyzeDaemon(frequency time.Duration) {
@@ -109,6 +119,7 @@ func (db *DB) getTableStats() (*tableStats, error) {
 	defer rows.Close()
 
 	if rows.Next() {
+		//nolint:exhaustruct
 		stats := tableStats{}
 
 		err = rows.Scan(

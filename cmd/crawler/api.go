@@ -10,7 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/node-crawler/pkg/api"
-	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
 )
@@ -34,12 +33,9 @@ var (
 )
 
 func startAPI(cCtx *cli.Context) error {
-	db, err := initDBReader(
-		crawlerDBFlag.Get(cCtx),
-		busyTimeoutFlag.Get(cCtx),
-	)
+	db, err := openDBReader(cCtx)
 	if err != nil {
-		return fmt.Errorf("init db failed: %w", err)
+		return fmt.Errorf("open db failed: %w", err)
 	}
 	defer db.Close()
 
@@ -48,7 +44,7 @@ func startAPI(cCtx *cli.Context) error {
 
 	// Start the API deamon
 	api := api.New(
-		database.NewAPIDB(db),
+		db,
 		statsUpdateFrequencyFlag.Get(cCtx),
 		enodeFlag.Get(cCtx),
 		path.Dir(snapshotFilenameFlag.Get(cCtx)),

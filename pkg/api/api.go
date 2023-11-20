@@ -42,7 +42,8 @@ func New(
 		enode:                enode,
 		snapshotDir:          snapshotDir,
 
-		stats: database.AllStats{},
+		stats:     database.AllStats{},
+		statsLock: sync.Mutex{},
 	}
 
 	go api.statsUpdaterDaemon()

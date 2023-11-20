@@ -137,7 +137,11 @@ type Version struct {
 	Build      string
 }
 
-var ErrVersion = Version{}
+var ErrVersion = Version{
+	version:    Unknown,
+	versionNum: []uint64{},
+	Build:      Unknown,
+}
 
 func (a Version) Cmp(b Version) int {
 	for i, val := range a.versionNum {
@@ -301,33 +305,54 @@ func handleLen2(parts []string) (*Client, error) {
 }
 
 func handleLen3(parts []string) (*Client, error) {
-	client := &Client{
-		Name: parts[0],
-	}
+	name := parts[0]
 
-	if client.Name == "reth" {
-		client.Language = "rust"
-		client.OS, client.Arch, _ = parseOSArch(parts[2])
-
-		return client, nil
-	}
-
-	if client.Name == "geth" {
-		client.Language = "go"
-
+	if name == "reth" {
 		version, err := parseVersion(parts[1])
 		if err != nil {
-			client.OS, client.Arch, _ = parseOSArch(parts[1])
-			client.Language = parts[2]
-
-			return client, nil
+			return nil, fmt.Errorf("parsing version failed: %w", err)
 		}
 
-		client.OS, client.Arch, _ = parseOSArch(parts[2])
-		client.Version = version.Version()
-		client.Build = version.Build
+		os, arch, _ := parseOSArch(parts[2])
 
-		return client, nil
+		return &Client{
+			Name:     name,
+			UserData: Unknown,
+			Version:  version.Version(),
+			Build:    version.Build,
+			OS:       os,
+			Arch:     arch,
+			Language: "rust",
+		}, nil
+	}
+
+	if name == "geth" {
+		version, err := parseVersion(parts[1])
+		if err != nil {
+			os, arch, _ := parseOSArch(parts[1])
+
+			return &Client{
+				Name:     name,
+				UserData: Unknown,
+				Version:  Unknown,
+				Build:    Unknown,
+				OS:       os,
+				Arch:     arch,
+				Language: parts[2],
+			}, nil
+		}
+
+		os, arch, _ := parseOSArch(parts[2])
+
+		return &Client{
+			Name:     name,
+			UserData: Unknown,
+			Version:  version.Version(),
+			Build:    version.Build,
+			OS:       os,
+			Arch:     arch,
+			Language: "go",
+		}, nil
 	}
 
 	return nil, ErrNotGethOrReth

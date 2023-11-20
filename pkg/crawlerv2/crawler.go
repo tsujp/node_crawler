@@ -47,7 +47,7 @@ type CrawlerV2 struct {
 	listener net.Listener
 }
 
-func NewCrawlerV2(
+func NewCrawler(
 	db *database.DB,
 	nodeKey *ecdsa.PrivateKey,
 	listenAddr string,
