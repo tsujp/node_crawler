@@ -203,7 +203,7 @@ templ SnapshotsList(files []fs.FileInfo) {
 							</a>
 						</td>
 						<td title={ strconv.FormatInt(file.Size(), 10) }>{ ByteCountIEC(file.Size()) }</td>
-						<td>{ file.ModTime().Format(time.DateTime) }</td>
+						<td>{ file.ModTime().UTC().Format(time.DateTime) }</td>
 					</tr>
 				}
 			</tbody>
