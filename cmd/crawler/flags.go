@@ -1,3 +1,4 @@
+//nolint:exhaustruct
 package main
 
 import (
@@ -101,6 +102,11 @@ var (
 		Name:  "stats-update",
 		Usage: "Frequency at which the stats are updated",
 		Value: 10 * time.Minute,
+	}
+	statsCopyFrequencyFlag = cli.DurationFlag{
+		Name:  "stats-copy-frequency",
+		Usage: "Frequency at which the stats should be copied to the stats DB",
+		Value: 30 * time.Minute,
 	}
 	nextCrawlSuccessFlag = cli.DurationFlag{
 		Name:  "next-crawl-success",

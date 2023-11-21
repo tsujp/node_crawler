@@ -42,7 +42,6 @@ var (
 		Action: crawlNodesV2,
 		Flags: []cli.Flag{
 			&autovacuumFlag,
-			&snapshotFilenameFlag,
 			&bootnodesFlag,
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
@@ -56,6 +55,8 @@ var (
 			&nodeKeyFileFlag,
 			&nodeURLFlag,
 			&nodedbFlag,
+			&snapshotFilenameFlag,
+			&statsCopyFrequencyFlag,
 			&timeoutFlag,
 			&workersFlag,
 			utils.GoerliFlag,
@@ -100,7 +101,7 @@ func crawlNodesV2(cCtx *cli.Context) error {
 	go db.TableStatsMetricsDaemon(5 * time.Minute)
 	go db.SnapshotDaemon(snapshotFilenameFlag.Get(cCtx))
 	go db.CleanerDaemon(15 * time.Minute)
-	go db.CopyStatsDaemon(1 * time.Minute)
+	go db.CopyStatsDaemon(statsCopyFrequencyFlag.Get(cCtx))
 
 	nodeKey, err := readNodeKey(cCtx)
 	if err != nil {
