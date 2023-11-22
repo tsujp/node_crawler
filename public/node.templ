@@ -333,11 +333,13 @@ templ NodeList(reqURL URL, nodes database.NodeList) {
 			<h3>Nodes</h3>
 			@NetworkFilterLinks(reqURL, nodes.NetworkFilter)
 			@SyncedFilterLinks(reqURL, nodes.Synced)
-			<form action="/nodes" method="get">
+			<form action="/nodes" method="get" styles="display: flex; flex-direction: row; gap: 0.5em; flex-wrap: wrap;">
 				<input name="network" type="hidden" value={ strconv.FormatInt(nodes.NetworkFilter, 10) }/>
 				<input name="page" type="hidden" value={ strconv.Itoa(nodes.PageNumber) }/>
 				<input name="synced" type="hidden" value={ intToAllYesNo(nodes.Synced) }/>
 				<input class={ pageButton(), pageButtonActive() } name="q" type="text" placeholder="Search IP or Node ID" value={ nodes.Query }/>
+				<input class={ pageButton(), pageButtonActive() } name="client_name" type="text" placeholder="Search Client Name" value={ nodes.ClientName }/>
+				<input class={ pageButton(), pageButtonActive() } name="client_user_data" type="text" placeholder="Search Client User Data" value={ nodes.ClientUserData }/>
 				<input class={ pageButton(), pageButtonActive() } type="submit" value="Search"/>
 			</form>
 			<div style="display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.5em;">

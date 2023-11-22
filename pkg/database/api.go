@@ -315,11 +315,11 @@ func (db *DB) GetNodeList(
 				)
 				AND (  -- Client Name filter
 					?6 = ''
-					OR crawled.client_name = ?6
+					OR crawled.client_name = LOWER(?6)
 				)
 				AND (
 					?7 = ''
-					OR crawled.client_user_data = ?7
+					OR crawled.client_user_data = LOWER(?7)
 				)
 			ORDER BY disc.node_id
 			LIMIT ?8 + 1

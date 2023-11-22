@@ -27,7 +27,7 @@ func (db *DB) migrateCrawledNodes() error {
 		SELECT
 			node_id,
 			updated_at,
-			client_name,
+			client_identifier,
 			rlpx_version,
 			capabilities,
 			network_id,
