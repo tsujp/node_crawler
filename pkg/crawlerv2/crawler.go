@@ -95,8 +95,8 @@ func (c *CrawlerV2) nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.
 	}
 
 	node := enode.NewV4(pubkey, ip, port, port)
-	node = c.discV4.Resolve(node)
-	node = c.discV5.Resolve(node)
+	// node = c.discV4.Resolve(node)
+	// node = c.discV5.Resolve(node)
 
 	return node
 }
