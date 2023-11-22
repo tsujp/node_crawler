@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/node-crawler/pkg/common"
@@ -37,6 +38,8 @@ func nodeIDString(start string, c byte) string {
 
 type CrawlerV2 struct {
 	db         *database.DB
+	discV4     *discover.UDPv4
+	discV5     *discover.UDPv5
 	nodeKey    *ecdsa.PrivateKey
 	listenAddr string
 	workers    int
@@ -49,20 +52,25 @@ type CrawlerV2 struct {
 
 func NewCrawler(
 	db *database.DB,
+	discV4 *discover.UDPv4,
+	discV5 *discover.UDPv5,
 	nodeKey *ecdsa.PrivateKey,
 	listenAddr string,
 	workers int,
 ) (*CrawlerV2, error) {
 	c := &CrawlerV2{
 		db:         db,
+		discV4:     discV4,
+		discV5:     discV5,
 		nodeKey:    nodeKey,
 		listenAddr: listenAddr,
 		workers:    workers,
-	}
 
-	c.wg = new(sync.WaitGroup)
-	c.ch = make(chan common.NodeJSON, 64)
-	c.toCrawl = make(chan *enode.Node)
+		toCrawl:  make(chan *enode.Node),
+		ch:       make(chan common.NodeJSON, 64),
+		wg:       new(sync.WaitGroup),
+		listener: nil,
+	}
 
 	return c, nil
 }
@@ -77,7 +85,7 @@ func (c *CrawlerV2) Close() {
 	}
 }
 
-func nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.Node {
+func (c *CrawlerV2) nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.Node {
 	var ip net.IP
 	var port int
 
@@ -86,7 +94,11 @@ func nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.Node {
 		port = tcp.Port
 	}
 
-	return enode.NewV4(pubkey, ip, port, port)
+	node := enode.NewV4(pubkey, ip, port, port)
+	node = c.discV4.Resolve(node)
+	node = c.discV5.Resolve(node)
+
+	return node
 }
 
 func (c *CrawlerV2) getClientInfo(
@@ -273,7 +285,7 @@ func (c *CrawlerV2) crawlPeer(fd net.Conn) {
 
 	c.getClientInfo(
 		conn,
-		nodeFromConn(pubKey, fd),
+		c.nodeFromConn(pubKey, fd),
 		common.DirectionAccept,
 	)
 }

@@ -121,6 +121,8 @@ func crawlNodesV2(cCtx *cli.Context) error {
 
 	crawler, err := crawlerv2.NewCrawler(
 		db,
+		disc.DiscV4(),
+		disc.DiscV5(),
 		nodeKey,
 		listenAddrFlag.Get(cCtx),
 		workersFlag.Get(cCtx),

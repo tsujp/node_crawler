@@ -65,6 +65,14 @@ func New(
 	return d, nil
 }
 
+func (d *Discovery) DiscV4() *discover.UDPv4 {
+	return d.v4
+}
+
+func (d *Discovery) DiscV5() *discover.UDPv5 {
+	return d.v5
+}
+
 func (d *Discovery) setupDiscovery() error {
 	addr, err := net.ResolveUDPAddr("udp", d.listenAddr)
 	if err != nil {
