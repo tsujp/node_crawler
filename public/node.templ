@@ -653,14 +653,16 @@ templ StatsGroup(name string, stats database.CountTotal) {
 	</div>
 }
 
-css navActive() {
-}
-
 templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 	<!DOCTYPE html>
 	<html lang="en-US">
 		<head>
-			<title>Node Crawler</title>
+			<title>Ethernets - Node Crawler</title>
+
+			<meta property="og:title" content="Ethernets - Node Crawler" />
+			<meta property="og:description" content="Ethereum network crawler." />
+			<meta property="og:image" content="/favicon.ico" />
+
 			<style type="text/css">
 				html, body {
 					margin: 0;
