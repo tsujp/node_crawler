@@ -1,3 +1,4 @@
+//nolint:exhaustruct
 package metrics
 
 import (
@@ -73,7 +74,18 @@ var (
 			"retry",
 		},
 	)
+	startTime = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "start_time",
+			Help:      "Unix timestamp when the service started",
+		},
+	)
 )
+
+func init() {
+	startTime.SetToCurrentTime()
+}
 
 func boolToStatus(b bool) string {
 	if b {
