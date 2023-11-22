@@ -379,6 +379,7 @@ func handleLen4(parts []string) (*Client, error) {
 
 func handleLen5(parts []string) (*Client, error) {
 	var versionStr, os, arch, lang string
+	userData := Unknown
 
 	// handle geth/v1.2.11-e3acd735-20231031/linux-amd64/go1.20.5/{d+}
 	if strings.TrimFunc(parts[4], unicode.IsDigit) == "" {
@@ -386,6 +387,7 @@ func handleLen5(parts []string) (*Client, error) {
 		os, arch, _ = parseOSArch(parts[2])
 		lang = parts[3]
 	} else {
+		userData = parts[1]
 		versionStr = parts[2]
 		os, arch, _ = parseOSArch(parts[3])
 		lang = parts[4]
@@ -398,7 +400,7 @@ func handleLen5(parts []string) (*Client, error) {
 
 	return &Client{
 		Name:     parts[0],
-		UserData: Unknown,
+		UserData: userData,
 		Version:  version.Version(),
 		Build:    version.Build,
 		OS:       os,
