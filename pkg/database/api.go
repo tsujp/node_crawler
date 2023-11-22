@@ -58,7 +58,21 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				city,
 				latitude,
 				longitude,
-				next_crawl
+				next_crawl,
+				EXISTS (
+					SELECT 1
+					FROM crawl_history history
+					WHERE
+						history.node_id = crawled.node_id
+						AND history.direction = 'dial'
+						AND (
+							history.crawled_at > unixepoch('now', '-7 days')
+							AND (
+								history.error IS NULL
+								OR history.error IN ('too many peers')
+							)
+						)
+				) dial_success
 			FROM discovered_nodes AS disc
 			LEFT JOIN crawled_nodes AS crawled ON (disc.node_id = crawled.node_id)
 			LEFT JOIN blocks ON (
@@ -103,6 +117,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		&nodePage.Latitude,
 		&nodePage.Longitude,
 		&nextCrawlInt,
+		&nodePage.DialSuccess,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("row scan failed: %w", err)
@@ -276,7 +291,21 @@ func (db *DB) GetNodeList(
 				crawled.client_os,
 				crawled.client_arch,
 				crawled.country,
-				blocks.timestamp
+				blocks.timestamp,
+				EXISTS (
+					SELECT 1
+					FROM crawl_history history
+					WHERE
+						history.node_id = crawled.node_id
+						AND history.direction = 'dial'
+						AND (
+							history.crawled_at > unixepoch('now', '-7 days')
+							AND (
+								history.error IS NULL
+								OR history.error IN ('too many peers')
+							)
+						)
+				) dial_success
 			FROM discovered_nodes AS disc
 				%s
 			LEFT JOIN crawled_nodes AS crawled ON (
@@ -380,6 +409,7 @@ func (db *DB) GetNodeList(
 			&row.ClientArch,
 			&row.Country,
 			&headHashTimeInt,
+			&row.DialSuccess,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan row failed: %w", err)

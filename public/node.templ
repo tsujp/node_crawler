@@ -109,6 +109,10 @@ templ NodeTable(nt database.NodeTable) {
 					<td>Is Synced</td>
 					<td>{ nt.IsSynced() }</td>
 				</tr>
+				<tr>
+					<td>Dial Success</td>
+					<td>{ boolToYesNo(nt.DialSuccess) }</td>
+				</tr>
 			</tbody>
 		</table>
 		<div style="position: relative; width: max-content; margin: 1em 0;">
@@ -378,6 +382,7 @@ templ NodeList(reqURL URL, nodes database.NodeList) {
 						<td>Last Update</td>
 						<td>Country</td>
 						<td>Is Synced</td>
+						<td>Dial Success</td>
 					</tr>
 				</thead>
 				<tbody>
@@ -396,6 +401,7 @@ templ NodeList(reqURL URL, nodes database.NodeList) {
 							}
 							<td>{ database.StringOrEmpty(row.Country) }</td>
 							<td>{ row.IsSynced() }</td>
+							<td>{ boolToYesNo(row.DialSuccess) }</td>
 						</tr>
 					}
 				</tbody>
@@ -422,6 +428,14 @@ templ NodeList(reqURL URL, nodes database.NodeList) {
 css disabled() {
 	pointer-events: none;
 	filter: saturate(0);
+}
+
+func boolToYesNo(b bool) string {
+	if b {
+		return "Yes"
+	}
+
+	return "No"
 }
 
 func boolToStr(b bool) string {

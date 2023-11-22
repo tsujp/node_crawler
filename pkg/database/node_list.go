@@ -24,6 +24,7 @@ type NodeListRow struct {
 	ClientArch        *string
 	Country           *string
 	HeadHashTimestamp *time.Time
+	DialSuccess       bool
 }
 
 func (n NodeListRow) NodeID() string {

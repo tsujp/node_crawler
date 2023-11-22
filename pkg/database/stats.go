@@ -86,12 +86,16 @@ func (db *DB) CopyStats() error {
 				END synced,
 				EXISTS (
 					SELECT 1
-					FROM crawl_history
+					FROM crawl_history history
 					WHERE
-						node_id = crawled.node_id
+						history.node_id = crawled.node_id
+						AND history.direction = 'dial'
 						AND (
-							error IS NULL
-							OR error IN ('too many peers')
+							history.crawled_at > unixepoch('now', '-7 days')
+							AND (
+								history.error IS NULL
+								OR history.error IN ('too many peers')
+							)
 						)
 				) dial_success,
 				COUNT(*) total

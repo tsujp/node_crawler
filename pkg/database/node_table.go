@@ -46,6 +46,7 @@ type NodeTable struct {
 	Latitude       *float64
 	Longitude      *float64
 	nextCrawl      *time.Time
+	DialSuccess    bool
 
 	HistoryAccept []NodeTableHistory
 	HistoryDial   []NodeTableHistory
