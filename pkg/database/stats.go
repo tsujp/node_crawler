@@ -48,15 +48,13 @@ func (db *DB) CreateStatsTables() error {
 // Copies the stats into the stats table every `frequency` duration.
 func (db *DB) CopyStatsDaemon(frequency time.Duration) {
 	for {
-		start := time.Now()
-		nextRun := start.Truncate(frequency).Add(frequency)
+		nextRun := time.Now().Truncate(frequency).Add(frequency)
+		time.Sleep(time.Until(nextRun))
 
 		err := db.CopyStats()
 		if err != nil {
 			log.Error("Copy stats failed", "err", err)
 		}
-
-		time.Sleep(time.Until(nextRun))
 	}
 }
 
