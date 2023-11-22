@@ -5,6 +5,8 @@ import "strconv"
 import "fmt"
 import "io/fs"
 import "time"
+import "net/url"
+import "net/http"
 
 templ NodeTable(nt database.NodeTable) {
 	<div style="margin: 1em;">
@@ -198,7 +200,7 @@ templ SnapshotsList(files []fs.FileInfo) {
 				for _, file := range files {
 					<tr>
 						<td>
-							<a href={ templ.URL(fmt.Sprintf("/snapshots/%s", file.Name())) }>
+							<a href={ templ.URL("/snapshots/" + file.Name()) }>
 								{ file.Name() }
 							</a>
 						</td>
@@ -256,22 +258,91 @@ css nodeListClass() {
 	margin: 1em;
 }
 
-templ NodeList(nodes database.NodeList) {
+type URL struct {
+	url.URL
+}
+
+func URLFromReq(r *http.Request) URL {
+	return URL{
+		url.URL{
+			Path: r.URL.Path,
+			RawQuery: r.URL.RawQuery,
+		},
+	}
+}
+
+func (u URL) RemoveParam(keys ...string) URL {
+	query := u.Query()
+
+	for _, key := range keys {
+		query.Del(key)
+	}
+
+	u.RawQuery = query.Encode()
+
+	return u
+}
+
+func (u URL) WithParam(key, value string) URL {
+	query := u.Query()
+	query.Set(key, value)
+
+	u.RawQuery = query.Encode()
+
+	return u
+}
+
+func (u URL) WithIntParam(key string, value int) URL {
+	valueStr := strconv.Itoa(value)
+
+	return u.WithParam(key, valueStr)
+}
+
+func (u URL) WithInt64Param(key string, value int64) URL {
+	valueStr := strconv.FormatInt(value, 10)
+
+	return u.WithParam(key, valueStr)
+}
+
+func (u URL) WithPath(path string) URL {
+	u.Path = path
+
+	return u
+}
+
+func (u URL) SafeURL() templ.SafeURL {
+	return templ.URL(u.String())
+}
+
+func intToAllYesNo(i int) string {
+	switch i {
+		case -1:
+			return "all"
+		case 0:
+			return "no"
+		case 1:
+			return "yes"
+		default:
+			panic("intToAllYesNo hit unreachable")
+	}
+}
+
+templ NodeList(reqURL URL, nodes database.NodeList) {
 	<div class={ nodeListClass() }>
 		<div style="width: 100%; display: flex; flex-direction: column; row-gap: 0.5em;">
 			<h3>Nodes</h3>
-			@NetworkFilterLinks(fmt.Sprintf("/nodes/?network=%%d&page=%d&synced=%d&q=%s", nodes.PageNumber, nodes.Synced, nodes.Query), nodes.NetworkFilter)
-			@SyncedFilterLinks(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%%d&q=%s", nodes.NetworkFilter, nodes.PageNumber, nodes.Query), nodes.Synced)
+			@NetworkFilterLinks(reqURL, nodes.NetworkFilter)
+			@SyncedFilterLinks(reqURL, nodes.Synced)
 			<form action="/nodes" method="get">
 				<input name="network" type="hidden" value={ strconv.FormatInt(nodes.NetworkFilter, 10) }/>
 				<input name="page" type="hidden" value={ strconv.Itoa(nodes.PageNumber) }/>
-				<input name="synced" type="hidden" value={ strconv.Itoa(nodes.Synced) }/>
+				<input name="synced" type="hidden" value={ intToAllYesNo(nodes.Synced) }/>
 				<input class={ pageButton(), pageButtonActive() } name="q" type="text" placeholder="Search IP or Node ID" value={ nodes.Query }/>
 				<input class={ pageButton(), pageButtonActive() } type="submit" value="Search"/>
 			</form>
 			<div style="display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.5em;">
 				<a
- 					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", nodes.NetworkFilter, nodes.Synced)) }
+ 					href={ reqURL.WithParam("q", "").WithParam("page", "1").SafeURL() }
  					class={
 						pageButton(),
 						templ.KV(pageButtonActive(), nodes.Query == ""),
@@ -282,7 +353,7 @@ templ NodeList(nodes database.NodeList) {
 				</a>
 				for _, c := range []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"} {
 					<a
- 						href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=%s", nodes.NetworkFilter, nodes.Synced, c)) }
+ 						href={ reqURL.WithParam("q", c).WithParam("page", "1").SafeURL() }
  						class={
 							pageButton(),
 							templ.KV(pageButtonActive(), nodes.Query == c),
@@ -329,14 +400,14 @@ templ NodeList(nodes database.NodeList) {
 			</table>
 			<div style="display:flex; flex-direction:row; justify-content:flex-end; align-items:center; gap:2em;">
 				<a
- 					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", nodes.NetworkFilter, nodes.PageNumber-1, nodes.Synced, nodes.Query)) }
+ 					href={ reqURL.WithIntParam("page", nodes.PageNumber-1).SafeURL() }
  					class={ pageButton(), pageButtonActive(), templ.KV(disabled(), nodes.PageNumber == 1) }
 				>
 					Previous
 				</a>
 				<span>{ strconv.Itoa(nodes.PageNumber) }</span>
 				<a
- 					href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=%d&synced=%d&q=%s", nodes.NetworkFilter, nodes.PageNumber+1, nodes.Synced, nodes.Query)) }
+ 					href={ reqURL.WithIntParam("page", nodes.PageNumber+1).SafeURL() }
  					class={ pageButton(), pageButtonActive(), templ.KV(disabled(), !nodes.HasNextPage) }
 				>
 					Next
@@ -359,19 +430,11 @@ func boolToStr(b bool) string {
 	return "false"
 }
 
-templ HistoryList(history database.HistoryList) {
+templ HistoryList(reqURL URL, history database.HistoryList) {
 	<div class={ nodeListClass() }>
 		<div style="width: 100%; display: flex; flex-direction: column; row-gap: 0.5em;">
 			<h3>History</h3>
-			@NetworkFilterLinks(
-				fmt.Sprintf(
-					"/history/?network=%%d&before=%s&after=%s&error=%d",
-					history.BeforeStr(),
-					history.AfterStr(),
-					history.IsError,
-				),
-				history.NetworkID,
-			)
+			@NetworkFilterLinks(reqURL, history.NetworkID)
 			<div style="display: flex; flex-direction: row; gap: 0.5em;">
 				<a
  					class={
@@ -379,12 +442,7 @@ templ HistoryList(history database.HistoryList) {
 						templ.KV(pageButtonActive(), history.IsError == -1),
 						templ.KV(pageButtonInactive(), history.IsError != -1),
 					}
- 					href={ templ.URL(fmt.Sprintf(
-								"/history/?network=%d&before=%s&after=%s&error=-1",
-								history.NetworkID,
-								history.BeforeStr(),
-								history.AfterStr(),
-							)) }
+ 					href={ reqURL.WithParam("error", "all").SafeURL() }
 				>
 					All
 				</a>
@@ -394,12 +452,7 @@ templ HistoryList(history database.HistoryList) {
 						templ.KV(pageButtonActive(), history.IsError == 1),
 						templ.KV(pageButtonInactive(), history.IsError != 1),
 					}
- 					href={ templ.URL(fmt.Sprintf(
-								"/history/?network=%d&before=%s&after=%s&error=1",
-								history.NetworkID,
-								history.BeforeStr(),
-								history.AfterStr(),
-							)) }
+ 					href={ reqURL.WithParam("error", "yes").SafeURL() }
 				>
 					Error
 				</a>
@@ -409,12 +462,7 @@ templ HistoryList(history database.HistoryList) {
 						templ.KV(pageButtonActive(), history.IsError == 0),
 						templ.KV(pageButtonInactive(), history.IsError != 0),
 					}
- 					href={ templ.URL(fmt.Sprintf(
-								"/history/?network=%d&before=%s&after=%s&error=0",
-								history.NetworkID,
-								history.BeforeStr(),
-								history.AfterStr(),
-							)) }
+ 					href={ reqURL.WithParam("error", "no").SafeURL() }
 				>
 					Success
 				</a>
@@ -427,11 +475,7 @@ templ HistoryList(history database.HistoryList) {
 				</form>
 				<a
  					class={ pageButton(), pageButtonActive() }
- 					href={ templ.URL(fmt.Sprintf(
-							"/history/?network=%d&error=%d",
-							history.NetworkID,
-							history.IsError,
-						)) }
+ 					href={ reqURL.RemoveParam("before", "after").SafeURL() }
  					title="We have to go back"
 				>
 					Go to now
@@ -467,13 +511,13 @@ templ HistoryList(history database.HistoryList) {
 					if history.FirstTime != nil && history.LastTime != nil {
 						<a
  							class={ pageButton(), pageButtonActive() }
- 							href={ templ.URL(fmt.Sprintf("/history/?network=%d&before=%s", history.NetworkID, history.FirstTimeStr())) }
+ 							href={ reqURL.RemoveParam("after").WithParam("before", history.FirstTimeStr()).SafeURL() }
 						>
 							Previous
 						</a>
 						<a
  							class={ pageButton(), pageButtonActive() }
- 							href={ templ.URL(fmt.Sprintf("/history/?network=%d&after=%s", history.NetworkID, history.LastTimeStr())) }
+ 							href={ reqURL.RemoveParam("before").WithParam("after", history.LastTimeStr()).SafeURL() }
 						>
 							Next
 						</a>
@@ -514,7 +558,7 @@ func networkName(networkID int64) string {
 	return name
 }
 
-templ NetworkFilterLinks(hrefTemplate string, networkID int64) {
+templ NetworkFilterLinks(url URL, networkID int64) {
 	<div style="display: flex; flex-direction: row; gap: 0.5em;">
 		for _, netID := range []int64{-1, 1, 5, 17000, 11155111} {
 			<a
@@ -523,7 +567,7 @@ templ NetworkFilterLinks(hrefTemplate string, networkID int64) {
 					templ.KV(pageButtonActive(), netID == networkID),
 					templ.KV(pageButtonInactive(), netID != networkID),
 				}
- 				href={ templ.URL(fmt.Sprintf(hrefTemplate, netID)) }
+ 				href={ url.WithInt64Param("network", netID).SafeURL() }
 			>
 				{ networkName(netID) }
 			</a>
@@ -531,7 +575,7 @@ templ NetworkFilterLinks(hrefTemplate string, networkID int64) {
 	</div>
 }
 
-templ SyncedFilterLinks(hrefTemplate string, synced int) {
+templ SyncedFilterLinks(url URL, synced int) {
 	<div style="display: flex; flex-direction: row; gap: 0.5em;">
 		<a
  			class={
@@ -539,7 +583,7 @@ templ SyncedFilterLinks(hrefTemplate string, synced int) {
 				templ.KV(pageButtonActive(), synced == -1),
 				templ.KV(pageButtonInactive(), synced != -1),
 			}
- 			href={ templ.URL(fmt.Sprintf(hrefTemplate, -1)) }
+ 			href={ url.WithParam("synced", "all").SafeURL() }
 		>
 			All
 		</a>
@@ -549,7 +593,7 @@ templ SyncedFilterLinks(hrefTemplate string, synced int) {
 				templ.KV(pageButtonActive(), synced == 1),
 				templ.KV(pageButtonInactive(), synced != 1),
 			}
- 			href={ templ.URL(fmt.Sprintf(hrefTemplate, 1)) }
+ 			href={ url.WithParam("synced", "yes").SafeURL() }
 		>
 			Synced
 		</a>
@@ -559,17 +603,17 @@ templ SyncedFilterLinks(hrefTemplate string, synced int) {
 				templ.KV(pageButtonActive(), synced == 0),
 				templ.KV(pageButtonInactive(), synced != 0),
 			}
- 			href={ templ.URL(fmt.Sprintf(hrefTemplate, 0)) }
+ 			href={ url.WithParam("synced", "no").SafeURL() }
 		>
 			Not Synced
 		</a>
 	</div>
 }
 
-templ Stats(networkID int64, synced int, stats ...templ.Component) {
+templ Stats(reqURL URL, networkID int64, synced int, stats ...templ.Component) {
 	<div style="display: flex; flex-direction: column; padding: 1em; gap: 1em;">
-		@NetworkFilterLinks(fmt.Sprintf("/?network=%%d&synced=%d", synced), networkID)
-		@SyncedFilterLinks(fmt.Sprintf("/?network=%d&synced=%%d", networkID), synced)
+		@NetworkFilterLinks(reqURL.WithPath("/"), networkID)
+		@SyncedFilterLinks(reqURL, synced)
 		<div style="display: flex; flex-direction: row; gap: 1em; flex-wrap: wrap;">
 			for _, stat := range stats {
 				{! stat }
@@ -593,7 +637,10 @@ templ StatsGroup(name string, stats database.CountTotal) {
 	</div>
 }
 
-templ Index(main templ.Component, networkID int64, synced int) {
+css navActive() {
+}
+
+templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 	<!DOCTYPE html>
 	<html lang="en-US">
 		<head>
@@ -648,6 +695,9 @@ templ Index(main templ.Component, networkID int64, synced int) {
 					padding: 0;
 					overflow: hidden;
 				}
+				nav li {
+					box-sizing: border-box;
+				}
 				nav li a,
 				nav li a:visited {
 					display: block;
@@ -656,8 +706,11 @@ templ Index(main templ.Component, networkID int64, synced int) {
 					padding: 1em;
 					text-decoration: none;
 				}
-				nav li a:hover {
+				nav li:hover {
 					background-color: #111;
+				}
+				nav li.active {
+					border-block-end: 3px solid orange;
 				}
 				input {
 					font-size: inherit;
@@ -667,11 +720,11 @@ templ Index(main templ.Component, networkID int64, synced int) {
 		<body>
 			<nav>
 				<ul>
-					<li><a href={ templ.URL(fmt.Sprintf("/?network=%d&synced=%d", networkID, synced)) }>Stats</a></li>
-					<li><a href={ templ.URL(fmt.Sprintf("/nodes/?network=%d&page=1&synced=%d&q=", networkID, synced)) }>Nodes</a></li>
-					<li><a href={ templ.URL(fmt.Sprintf("/history/?network=%d", networkID)) }>Crawl History</a></li>
-					<li><a href="/help">Help</a></li>
-					<li><a href="/snapshots/">Snapshots</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/") }><a href={ reqURL.WithPath("/").SafeURL() }>Stats</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/nodes/") }><a href={ reqURL.WithPath("/nodes/").WithParam("page", "1").SafeURL() }>Nodes</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/history/") }><a href={ reqURL.WithPath("/history/").RemoveParam("after", "before").SafeURL() }>Crawl History</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/help/") }><a href="/help/">Help</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/snapshots/") }><a href="/snapshots/">Snapshots</a></li>
 				</ul>
 			</nav>
 			<main>

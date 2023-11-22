@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -132,7 +131,7 @@ func (a *API) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	sb := new(strings.Builder)
 
 	nodeTable := public.NodeTable(*nodes)
-	index := public.Index(nodeTable, 1, -1)
+	index := public.Index(public.URLFromReq(r), nodeTable, 1, -1)
 	_ = index.Render(r.Context(), sb)
 
 	// This is the worst, but templating the style attribute is
@@ -147,32 +146,92 @@ func (a *API) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(out))
 }
 
-func setQuery(url *url.URL, key, value string) *url.URL {
-	newURL := *url
-	query := newURL.Query()
-	query.Set(key, value)
-	newURL.RawQuery = query.Encode()
+func parseAllYesNoParam(w http.ResponseWriter, str string, param string) (int, bool) {
+	switch str {
+	case "":
+		return 1, true
+	case "all":
+		return -1, true
+	case "yes":
+		return 1, true
+	case "no":
+		return 0, true
+	}
 
-	return &newURL
+	synced, err := strconv.Atoi(str)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprintf(w, "bad %s value: %s\n", param, str)
+
+		return 0, false
+	}
+
+	if synced != -1 && synced != 0 && synced != 1 {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprintf(w, "bad %s value: %s. Must be one of all, yes, no\n", param, str)
+
+		return 0, false
+	}
+
+	return synced, true
+}
+
+func parseSyncedParam(w http.ResponseWriter, str string) (int, bool) {
+	return parseAllYesNoParam(w, str, "synced")
+}
+
+func parseErrorParam(w http.ResponseWriter, str string) (int, bool) {
+	return parseAllYesNoParam(w, str, "error")
+}
+
+func parsePageNum(w http.ResponseWriter, pageNumStr string) (int, bool) {
+	if pageNumStr == "" {
+		return 1, true
+	}
+
+	pageNumber, err := strconv.Atoi(pageNumStr)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprintf(w, "bad page number value: %s\n", pageNumStr)
+
+		return 0, false
+	}
+
+	if pageNumber <= 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprintf(w, "bad page number value, must be greater than 0: %d", pageNumber)
+
+		return 0, false
+	}
+
+	return pageNumber, true
+}
+
+func parseNetworkID(w http.ResponseWriter, networkIDStr string) (int64, bool) {
+	if networkIDStr == "" {
+		return 1, true
+	}
+
+	networkID, err := strconv.ParseInt(networkIDStr, 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
+
+		return 0, false
+	}
+
+	return networkID, true
 }
 
 func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
-	var pageNumber int
-	var networkID int64
-	var synced int
-	var query string
-	var err error
-
-	redirectURL := r.URL
-	redirect := false
-
 	urlQuery := r.URL.Query()
 
 	pageNumStr := urlQuery.Get("page")
 	networkIDStr := urlQuery.Get("network")
 	syncedStr := urlQuery.Get("synced")
-	query = urlQuery.Get("q")
+	query := urlQuery.Get("q")
 	clientName := urlQuery.Get("client_name")
+	clientUserData := urlQuery.Get("client_user_data")
 
 	// This is a full node ID, just redirect to the node's page
 	if len(query) == 64 {
@@ -181,59 +240,18 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if pageNumStr == "" {
-		redirectURL = setQuery(redirectURL, "page", "1")
-		redirect = true
-	} else {
-		pageNumber, err = strconv.Atoi(pageNumStr)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad page number value: %s\n", pageNumStr)
-
-			return
-		}
-		if pageNumber < 1 {
-			redirectURL = setQuery(redirectURL, "page", "1")
-			redirect = true
-		}
+	pageNumber, ok := parsePageNum(w, pageNumStr)
+	if !ok {
+		return
 	}
 
-	if networkIDStr == "" {
-		redirectURL = setQuery(redirectURL, "network", "1")
-		redirect = true
-	} else {
-		networkID, err = strconv.ParseInt(networkIDStr, 10, 64)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
-
-			return
-		}
+	networkID, ok := parseNetworkID(w, networkIDStr)
+	if !ok {
+		return
 	}
 
-	if syncedStr == "" {
-		redirectURL = setQuery(redirectURL, "synced", "1")
-		redirect = true
-	} else {
-		synced, err = strconv.Atoi(syncedStr)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad synced value: %s\n", networkIDStr)
-
-			return
-		}
-
-		if synced != -1 && synced != 0 && synced != 1 {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad synced value: %s. Must be one of -1, 0, 1\n", syncedStr)
-
-			return
-		}
-	}
-
-	if redirect {
-		http.Redirect(w, r, redirectURL.String(), http.StatusTemporaryRedirect)
-
+	synced, ok := parseSyncedParam(w, syncedStr)
+	if !ok {
 		return
 	}
 
@@ -252,6 +270,7 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		synced,
 		*nodeListQuery,
 		clientName,
+		clientUserData,
 	)
 	if err != nil {
 		log.Error("get node list failed", "err", err, "pageNumber", pageNumber)
@@ -261,58 +280,24 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodeList := public.NodeList(*nodes)
-	index := public.Index(nodeList, networkID, synced)
+	reqURL := public.URLFromReq(r)
+
+	nodeList := public.NodeList(reqURL, *nodes)
+	index := public.Index(reqURL, nodeList, networkID, synced)
 	_ = index.Render(r.Context(), w)
 }
 
 func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
-	var networkID int64
-	var synced int
-	var err error
-
-	redirectURL := r.URL
-	redirect := false
-
 	networkIDStr := r.URL.Query().Get("network")
 	syncedStr := r.URL.Query().Get("synced")
 
-	if networkIDStr == "" {
-		redirectURL = setQuery(redirectURL, "network", "1")
-		redirect = true
-	} else {
-		networkID, err = strconv.ParseInt(networkIDStr, 10, 64)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
-
-			return
-		}
+	networkID, ok := parseNetworkID(w, networkIDStr)
+	if !ok {
+		return
 	}
 
-	if syncedStr == "" {
-		redirectURL = setQuery(redirectURL, "synced", "1")
-		redirect = true
-	} else {
-		synced, err = strconv.Atoi(syncedStr)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad synced value: %s\n", networkIDStr)
-
-			return
-		}
-
-		if synced != -1 && synced != 0 && synced != 1 {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad synced value: %s. Must be one of -1, 0, 1\n", syncedStr)
-
-			return
-		}
-	}
-
-	if redirect {
-		http.Redirect(w, r, redirectURL.String(), http.StatusTemporaryRedirect)
-
+	synced, ok := parseSyncedParam(w, syncedStr)
+	if !ok {
 		return
 	}
 
@@ -348,7 +333,10 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 
+	reqURL := public.URLFromReq(r)
+
 	statsPage := public.Stats(
+		reqURL,
 		networkID,
 		synced,
 		public.StatsGroup("Client Names", stats.CountClientName()),
@@ -357,7 +345,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		// public.StatsGroup("Languages", stats.GroupLanguage()),
 	)
 
-	index := public.Index(statsPage, networkID, synced)
+	index := public.Index(reqURL, statsPage, networkID, synced)
 
 	sb := new(strings.Builder)
 	_ = index.Render(r.Context(), sb)
@@ -368,14 +356,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) handleHistoryList(w http.ResponseWriter, r *http.Request) {
-	var networkID int64
-	var isError int
 	var before, after *time.Time
-
-	var err error
-
-	redirectURL := r.URL
-	redirect := false
 
 	query := r.URL.Query()
 	networkIDStr := query.Get("network")
@@ -383,37 +364,14 @@ func (a *API) handleHistoryList(w http.ResponseWriter, r *http.Request) {
 	beforeStr := query.Get("before")
 	afterStr := query.Get("after")
 
-	if networkIDStr == "" {
-		redirectURL = setQuery(redirectURL, "network", "1")
-		redirect = true
-	} else {
-		networkID, err = strconv.ParseInt(networkIDStr, 10, 64)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad network id value: %s\n", networkIDStr)
-
-			return
-		}
+	networkID, ok := parseNetworkID(w, networkIDStr)
+	if !ok {
+		return
 	}
 
-	if isErrorStr == "" {
-		redirectURL = setQuery(redirectURL, "error", "-1")
-		redirect = true
-	} else {
-		isError, err = strconv.Atoi(isErrorStr)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad error value: %s\n", networkIDStr)
-
-			return
-		}
-
-		if isError != -1 && isError != 0 && isError != 1 {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = fmt.Fprintf(w, "bad error value: %s. Must be one of -1, 0, 1\n", isErrorStr)
-
-			return
-		}
+	isError, ok := parseErrorParam(w, isErrorStr)
+	if !ok {
+		return
 	}
 
 	if beforeStr != "" {
@@ -449,14 +407,8 @@ func (a *API) handleHistoryList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if beforeStr == "" && afterStr == "" {
-		redirectURL = setQuery(redirectURL, "after", time.Now().UTC().Format(database.DateTimeLocal))
-		redirect = true
-	}
-
-	if redirect {
-		http.Redirect(w, r, redirectURL.String(), http.StatusTemporaryRedirect)
-
-		return
+		afterT := time.Now().UTC()
+		after = &afterT
 	}
 
 	historyList, err := a.db.GetHistoryList(r.Context(), before, after, networkID, isError)
@@ -467,8 +419,11 @@ func (a *API) handleHistoryList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	reqURL := public.URLFromReq(r)
+
 	index := public.Index(
-		public.HistoryList(*historyList),
+		reqURL,
+		public.HistoryList(reqURL, *historyList),
 		networkID,
 		1,
 	)
@@ -488,7 +443,7 @@ func handleFavicon(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleHelp(w http.ResponseWriter, r *http.Request) {
 	helpPage := public.HelpPage(a.enode)
 
-	index := public.Index(helpPage, 1, -1)
+	index := public.Index(public.URLFromReq(r), helpPage, 1, -1)
 	_ = index.Render(r.Context(), w)
 }
 
@@ -537,7 +492,7 @@ func (a *API) handleSnapshotsList(w http.ResponseWriter, r *http.Request) {
 
 	snapshotList := public.SnapshotsList(files)
 
-	index := public.Index(snapshotList, 1, 1)
+	index := public.Index(public.URLFromReq(r), snapshotList, 1, 1)
 	_ = index.Render(r.Context(), w)
 }
 

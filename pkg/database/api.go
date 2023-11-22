@@ -248,6 +248,7 @@ func (db *DB) GetNodeList(
 	synced int,
 	query NodeListQuery,
 	clientName string,
+	clientUserData string,
 ) (*NodeList, error) {
 	var err error
 
@@ -269,6 +270,7 @@ func (db *DB) GetNodeList(
 				disc.node_id,
 				crawled.updated_at,
 				crawled.client_name,
+				crawled.client_user_data,
 				crawled.client_version,
 				crawled.client_build,
 				crawled.client_os,
@@ -315,9 +317,13 @@ func (db *DB) GetNodeList(
 					?6 = ''
 					OR crawled.client_name = ?6
 				)
+				AND (
+					?7 = ''
+					OR crawled.client_user_data = ?7
+				)
 			ORDER BY disc.node_id
-			LIMIT ?7 + 1
-			OFFSET ?8
+			LIMIT ?8 + 1
+			OFFSET ?9
 		`, hint),
 		networkID,
 		synced,
@@ -325,6 +331,7 @@ func (db *DB) GetNodeList(
 		query.NodeIDEnd,
 		query.IP,
 		clientName,
+		clientUserData,
 		pageSize,
 		offset,
 	)
@@ -334,15 +341,16 @@ func (db *DB) GetNodeList(
 	defer rows.Close()
 
 	out := NodeList{
-		PageSize:      pageSize,
-		PageNumber:    pageNumber,
-		HasNextPage:   false,
-		Synced:        synced,
-		Offset:        offset,
-		List:          []NodeListRow{},
-		NetworkFilter: networkID,
-		Query:         query.Query,
-		ClientName:    clientName,
+		PageSize:       pageSize,
+		PageNumber:     pageNumber,
+		HasNextPage:    false,
+		Synced:         synced,
+		Offset:         offset,
+		List:           []NodeListRow{},
+		NetworkFilter:  networkID,
+		Query:          query.Query,
+		ClientName:     clientName,
+		ClientUserData: clientUserData,
 	}
 
 	rowNumber := 0
@@ -359,11 +367,13 @@ func (db *DB) GetNodeList(
 
 		row := NodeListRow{}
 		var updatedAtInt, headHashTimeInt *int64
+		var userData *string
 
 		err = rows.Scan(
 			&row.nodeID,
 			&updatedAtInt,
 			&row.ClientName,
+			&userData,
 			&row.ClientVersion,
 			&row.ClientBuild,
 			&row.ClientOS,
@@ -377,6 +387,11 @@ func (db *DB) GetNodeList(
 
 		row.UpdatedAt = int64PrtToTimePtr(updatedAtInt)
 		row.HeadHashTimestamp = int64PrtToTimePtr(headHashTimeInt)
+
+		if row.ClientName != nil && userData != nil {
+			newName := *row.ClientName + "/" + *userData
+			row.ClientName = &newName
+		}
 
 		out.List = append(out.List, row)
 	}
@@ -573,6 +588,7 @@ func (db *DB) GetHistoryList(
 			SELECT
 				history.node_id,
 				crawled.client_name,
+				crawled.client_user_data,
 				crawled.network_id,
 				history.crawled_at,
 				history.direction,
@@ -630,10 +646,12 @@ func (db *DB) GetHistoryList(
 		row := HistoryListRow{}
 		nodeIDBytes := make([]byte, 32)
 		var crawledAtInt int64
+		var userData *string
 
 		err := rows.Scan(
 			&nodeIDBytes,
 			&row.ClientName,
+			&userData,
 			&row.NetworkID,
 			&crawledAtInt,
 			&row.Direction,
@@ -645,6 +663,11 @@ func (db *DB) GetHistoryList(
 
 		row.NodeID = hex.EncodeToString(nodeIDBytes[:])
 		row.CrawledAt = time.Unix(crawledAtInt, 0)
+
+		if row.ClientName != nil && userData != nil {
+			newName := *row.ClientName + "/" + *userData
+			row.ClientName = &newName
+		}
 
 		historyList.Rows = append(historyList.Rows, row)
 	}

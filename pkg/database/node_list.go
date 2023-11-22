@@ -39,14 +39,15 @@ func (n NodeListRow) IsSynced() string {
 }
 
 type NodeList struct {
-	PageNumber    int
-	PageSize      int
-	HasNextPage   bool
-	Synced        int
-	Offset        int
-	NetworkFilter int64
-	Query         string
-	ClientName    string
+	PageNumber     int
+	PageSize       int
+	HasNextPage    bool
+	Synced         int
+	Offset         int
+	NetworkFilter  int64
+	Query          string
+	ClientName     string
+	ClientUserData string
 
 	List []NodeListRow
 }
