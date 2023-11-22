@@ -47,6 +47,9 @@ CREATE INDEX IF NOT EXISTS crawled_nodes_ip_address
 	ON crawled_nodes (ip_address);
 CREATE INDEX IF NOT EXISTS crawled_nodes_client_name
 	ON crawled_nodes (client_name);
+CREATE INDEX IF NOT EXISTS crawled_nodes_client_user_data
+	ON crawled_nodes (client_user_data)
+	WHERE client_user_data IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS crawl_history (
 	node_id		BLOB	NOT NULL,
