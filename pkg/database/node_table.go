@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -23,7 +24,7 @@ type NodeTable struct {
 	nodeID         []byte
 	lastFound      time.Time
 	updatedAt      *time.Time
-	Enode          *string
+	NodeRecord     *enr.Record
 	ClientID       *string
 	ClientName     *string
 	ClientUserData *string

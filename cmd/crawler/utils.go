@@ -55,9 +55,9 @@ func openDBWriter(cCtx *cli.Context, geoipDB *geoip2.Reader) (*database.DB, erro
 		return nil, fmt.Errorf("setting main pragmas failed: %w", err)
 	}
 
-	err = db.CreateTables()
+	err = db.Migrate()
 	if err != nil {
-		return nil, fmt.Errorf("create tables failed: %w", err)
+		return nil, fmt.Errorf("database migration failed: %w", err)
 	}
 
 	// Setup stats DB

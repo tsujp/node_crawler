@@ -55,7 +55,7 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 		`
 			INSERT INTO discovered_nodes (
 				node_id,
-				network_address,
+				node_record,
 				ip_address,
 				first_found,
 				last_found,
@@ -91,7 +91,7 @@ func (db *DB) UpdateCrawledNodeFail(node common.NodeJSON) error {
 			ON CONFLICT (node_id, crawled_at) DO NOTHING;
 		`,
 		node.ID(),
-		node.N.String(),
+		common.EncodeENR(node.N.Record()),
 		node.N.IP().String(),
 		node.Direction,
 		node.Error,
@@ -114,7 +114,7 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 		`
 			INSERT INTO discovered_nodes (
 				node_id,
-				network_address,
+				node_record,
 				ip_address,
 				first_found,
 				last_found,
@@ -133,7 +133,7 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 			WHERE ?5 == 'dial'
 		`,
 		node.ID(),
-		node.N.String(),
+		common.EncodeENR(node.N.Record()),
 		node.N.IP().String(),
 		db.nextCrawlNotEth+randomHourSeconds(),
 		node.Direction,
@@ -248,7 +248,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 
 			INSERT INTO discovered_nodes (
 				node_id,
-				network_address,
+				node_record,
 				ip_address,
 				first_found,
 				last_found,
@@ -308,7 +308,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 		location.city,
 		location.latitude,
 		location.longitude,
-		node.N.String(),
+		common.EncodeENR(node.N.Record()),
 		node.Direction,
 		db.nextCrawlSucces+randomHourSeconds(),
 	)
@@ -331,10 +331,8 @@ func (db *DB) InsertBlocks(blocks []*types.Header, networkID uint64) error {
 			block_hash,
 			network_id,
 			timestamp,
-			block_number,
-			parent_hash
+			block_number
 		) VALUES (
-			?,
 			?,
 			?,
 			?,
@@ -356,7 +354,6 @@ func (db *DB) InsertBlocks(blocks []*types.Header, networkID uint64) error {
 				networkID,
 				block.Time,
 				block.Number.Uint64(),
-				block.ParentHash.Bytes(),
 			)
 		})
 		metrics.ObserveDBQuery("insert_block", start, err)

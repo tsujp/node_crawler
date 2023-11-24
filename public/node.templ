@@ -7,6 +7,7 @@ import "io/fs"
 import "time"
 import "net/url"
 import "net/http"
+import "github.com/ethereum/node-crawler/pkg/common"
 
 templ NodeTable(nt database.NodeTable) {
 	<div style="margin: 1em;">
@@ -59,7 +60,11 @@ templ NodeTable(nt database.NodeTable) {
 				</tr>
 				<tr>
 					<td>Enode</td>
-					<td>{ database.StringOrEmpty(nt.Enode) }</td>
+					<td>{ common.EnodeString(nt.NodeRecord) }</td>
+				</tr>
+				<tr>
+					<td>Record</td>
+					<td>{ common.ENRString(nt.NodeRecord) }</td>
 				</tr>
 				<tr>
 					<td>RLPx Version</td>

@@ -22,7 +22,7 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 		`
 			INSERT INTO discovered_nodes (
 				node_id,
-				network_address,
+				node_record,
 				ip_address,
 				first_found,
 				last_found,
@@ -37,15 +37,15 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 			)
 			ON CONFLICT (node_id) DO UPDATE
 			SET
-				network_address = excluded.network_address,
+				node_record = excluded.node_record,
 				ip_address = excluded.ip_address,
 				last_found = unixepoch()
 			WHERE
-				network_address != excluded.network_address
+				node_record != excluded.node_record
 				OR unixepoch() - last_found > 3600 -- Update at most once per hour
 		`,
 		node.ID().Bytes(),
-		node.String(),
+		common.EncodeENR(node.Record()),
 		node.IP().String(),
 	)
 	if err != nil {
@@ -64,7 +64,7 @@ func (d *DB) SelectDiscoveredNodeSlice(limit int) ([]*enode.Node, error) {
 	rows, err := d.db.Query(
 		`
 			SELECT
-				network_address
+				node_record
 			FROM discovered_nodes
 			WHERE
 				next_crawl < unixepoch()
@@ -80,16 +80,21 @@ func (d *DB) SelectDiscoveredNodeSlice(limit int) ([]*enode.Node, error) {
 
 	out := make([]*enode.Node, 0, limit)
 	for rows.Next() {
-		var enr string
+		var enrBytes []byte
 
-		err = rows.Scan(&enr)
+		err = rows.Scan(&enrBytes)
 		if err != nil {
 			return nil, fmt.Errorf("scanning row failed: %w", err)
 		}
 
-		node, err := common.ParseNode(enr)
+		record, err := common.LoadENR(enrBytes)
 		if err != nil {
-			return nil, fmt.Errorf("parsing enr failed: %w, %s", err, enr)
+			return nil, fmt.Errorf("failed to load enr: %w", err)
+		}
+
+		node, err := common.RecordToEnode(record)
+		if err != nil {
+			return nil, fmt.Errorf("parsing enr failed: %w, %s", err, enrBytes)
 		}
 
 		out = append(out, node)

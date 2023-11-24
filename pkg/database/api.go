@@ -36,7 +36,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 				disc.node_id,
 				disc.last_found,
 				crawled.updated_at,
-				network_address,
+				disc.node_record,
 				client_identifier,
 				client_name,
 				client_user_data,
@@ -89,12 +89,13 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 	var lastFound int64
 	var updatedAtInt, headHashTimeInt, nextCrawlInt *int64
 	var forkIDInt *uint32
+	var nodeRecord []byte
 
 	err = row.Scan(
 		&nodePage.nodeID,
 		&lastFound,
 		&updatedAtInt,
-		&nodePage.Enode,
+		&nodeRecord,
 		&nodePage.ClientID,
 		&nodePage.ClientName,
 		&nodePage.ClientUserData,
@@ -132,6 +133,13 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		fid := Uint32ToForkID(*forkIDInt)
 		nodePage.ForkID = &fid
 	}
+
+	record, err := common.LoadENR(nodeRecord)
+	if err != nil {
+		return nil, fmt.Errorf("loading node record failed: %w", err)
+	}
+
+	nodePage.NodeRecord = record
 
 	rows, err := db.db.QueryContext(
 		ctx,

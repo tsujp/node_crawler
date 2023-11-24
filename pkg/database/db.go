@@ -76,18 +76,6 @@ func (db *DB) AnalyzeDaemon(frequency time.Duration) {
 	}
 }
 
-//go:embed sql/schema.sql
-var schema string
-
-func (db *DB) CreateTables() error {
-	_, err := db.db.Exec(schema)
-	if err != nil {
-		return fmt.Errorf("creating table discovered_nodes failed: %w", err)
-	}
-
-	return nil
-}
-
 type tableStats struct {
 	totalDiscoveredNodes int64
 	totalCrawledNodes    int64
