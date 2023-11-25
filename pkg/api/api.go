@@ -362,7 +362,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		networkID,
 		synced,
 		[]templ.Component{
-			public.StatsGraph("Client Names", clientNames.ClientNameTimeseries()),
+			public.StatsGraph("Client Names", "client_names", clientNames.Timeseries()),
 		},
 		[]templ.Component{
 			public.StatsGroup("Client Names", clientNames.Last()),
@@ -466,6 +466,21 @@ func handleFavicon(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(public.Favicon)
 }
 
+func handleStatic(w http.ResponseWriter, r *http.Request) {
+	filename := strings.TrimPrefix(r.URL.Path, "/static/")
+	file, ok := public.StaticFiles[filename]
+
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = fmt.Fprint(w, "Not Found")
+
+		return
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	_, _ = w.Write(file)
+}
+
 func (a *API) handleHelp(w http.ResponseWriter, r *http.Request) {
 	helpPage := public.HelpPage(a.enode)
 
@@ -554,10 +569,11 @@ func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 
 	router.HandleFunc("/", a.handleRoot)
 	router.HandleFunc("/favicon.ico", handleFavicon)
-	router.HandleFunc("/snapshots/", a.handleSnapshots)
 	router.HandleFunc("/help/", a.handleHelp)
 	router.HandleFunc("/history/", a.handleHistoryList)
 	router.HandleFunc("/nodes/", a.nodesHandler)
+	router.HandleFunc("/snapshots/", a.handleSnapshots)
+	router.HandleFunc("/static/", handleStatic)
 
 	log.Info("Starting API", "address", address)
 	_ = http.ListenAndServe(address, router)

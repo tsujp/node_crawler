@@ -121,8 +121,8 @@ templ NodeTable(nt database.NodeTable) {
 			</tbody>
 		</table>
 		<div style="position: relative; width: max-content; margin: 1em 0;">
-			<image width="800px" src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Blue_Marble_2002.png/1280px-Blue_Marble_2002.png"></image>
-			<image style="REPLACE_THIS_ETH_LOGO" height="10%" src="https://ethereum.org/static/2aba39d4e25d90caabb0c85a58c6aba9/f41b0/eth-glyph-colored.png"></image>
+			<image width="800px" src="/static/blue-marble.png"></image>
+			<image style="REPLACE_THIS_ETH_LOGO" height="10%" src="/static/eth-diamond-purple.png"></image>
 		</div>
 		<h3>Crawl Hitory</h3>
 		<div style="display: flex; flex-wrap: wrap; column-gap: 2em;">
@@ -506,7 +506,7 @@ templ HistoryList(reqURL URL, history database.HistoryList) {
 				<thead>
 					<tr>
 						<td>Node ID</td>
-						<td>Client Name</td>
+						<td>Client Identifier</td>
 						<td>Network ID</td>
 						<td>Crawled At</td>
 						<td>Direction</td>
@@ -517,7 +517,7 @@ templ HistoryList(reqURL URL, history database.HistoryList) {
 					for _, row := range history.Rows {
 						<tr>
 							<td><a href={ templ.URL("/nodes/" + row.NodeID) }>{ row.NodeID[:8] }</a></td>
-							<td>{ database.StringOrEmpty(row.ClientName) }</td>
+							<td>{ database.StringOrEmpty(row.ClientIdentifier) }</td>
 							<td>{ row.NetworkIDStr() }</td>
 							<td title={ row.CrawledAt.UTC().Format(database.DateFormat) }>{ row.SinceCrawled() }</td>
 							<td>{ row.Direction }</td>
@@ -652,11 +652,13 @@ templ Stats(reqURL URL, networkID int64, synced int, charts []templ.Component, s
 	</div>
 }
 
-script statsGraph(id string, ts database.Timeseries) {
+script statsGraph(title string, id string, ts database.Timeseries) {
 	let chart = echarts.init(document.getElementById(id), 'dark');
 	chart.setOption({
+		animation: false,
+		backgroundColor: '#111',
 		title: {
-	    text: 'Stacked Area Chart'
+	    text: title,
 	  },
 	  tooltip: {
 	    trigger: 'axis',
@@ -664,8 +666,8 @@ script statsGraph(id string, ts database.Timeseries) {
 	      type: 'cross',
 	      label: {
 	        backgroundColor: '#6a7985'
-	      }
-	    }
+	      },
+	    },
 	  },
 	  legend: {
 	    data: ts.legend,
@@ -673,19 +675,19 @@ script statsGraph(id string, ts database.Timeseries) {
 	  toolbox: {
 	    feature: {
 	      saveAsImage: {}
-	    }
+	    },
 	  },
 	  grid: {
 	    left: '3%',
 	    right: '4%',
 	    bottom: '3%',
-	    containLabel: true
+	    containLabel: true,
 	  },
 	  xAxis: ts.xAxis,
 	  yAxis: [
 	    {
-	      type: 'value'
-	    }
+	      type: 'value',
+	    },
 	  ],
 	  series: ts.series,
 	});
@@ -695,9 +697,9 @@ script statsGraph(id string, ts database.Timeseries) {
 	});
 }
 
-templ StatsGraph(id string, ts database.Timeseries) {
+templ StatsGraph(title string, id string, ts database.Timeseries) {
 	<div class="chart" id={ id }></div>
-	@statsGraph(id, ts)
+	@statsGraph(title, id, ts)
 }
 
 templ StatsGroup(name string, stats database.CountTotal) {
@@ -721,8 +723,8 @@ templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 			<title>Ethernets - Node Crawler</title>
 
 			<meta property="og:title" content="Ethernets - Node Crawler" />
-			<meta property="og:description" content="Ethereum network crawler." />
-			<meta property="og:image" content="https://ethereum.org/static/b135b7f22d4d74f3e8566221b1079cf3/fd8d9/eth-diamond-purple.png" />
+			<meta property="og:description" content="Crawls all the Ethereum networks." />
+			<meta property="og:image" content="/eth-diamond-purple.png" />
 
 			<script src="https://unpkg.com/echarts@5.4.3/dist/echarts.min.js"></script>
 
@@ -733,6 +735,9 @@ templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 					color: #eee;
 				}
 				.chart {
+					padding: 1em;
+					border: 1px solid orange;
+					border-radius: 1em;
 			    width: 100%;
 			    height: 400px;
 			  }

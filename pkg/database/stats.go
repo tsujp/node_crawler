@@ -292,7 +292,7 @@ func newFloat(i int64) *float64 {
 	return &f
 }
 
-func (s AllCountTotal) ClientNameTimeseries() Timeseries {
+func (s AllCountTotal) Timeseries() Timeseries {
 	timestampMap := map[time.Time]struct{}{}
 
 	for _, c := range s {
@@ -330,54 +330,53 @@ func (s AllCountTotal) ClientNameTimeseries() Timeseries {
 		}
 	}
 
-	ss := ChartSeries{
-		Name:      "geth",
-		Type:      "line",
-		Stack:     "Total",
-		AreaStyle: struct{}{},
-		Emphasis: ChartSeriesEmphasis{
-			Focus: "series",
-		},
-		Data: make([]*float64, 0, len(outTs)),
-	}
+	timeseries := map[string][]*float64{}
 
-	for _, ts := range outTs {
+	for i, ts := range outTs {
 		for _, e := range s {
-			log.Info("ts", "ts", ts, "ts2", e.Timestamp)
 			if e.Timestamp.Equal(ts) {
-				log.Info("match", "ts", ts, "ts2", e.Timestamp)
 				for _, ee := range e.Values {
-					log.Info("values", "key", ee.Key)
-					if ee.Key == "geth" {
-						ss.Data = append(ss.Data, newFloat(ee.Count))
-
-						break
+					data, ok := timeseries[ee.Key]
+					if ok {
+						data[i] = newFloat(ee.Count)
+					} else {
+						data := make([]*float64, len(outTs))
+						data[i] = newFloat(ee.Count)
+						timeseries[ee.Key] = data
 					}
-
-					ss.Data = append(ss.Data, nil)
 				}
 			}
 		}
 	}
 
-	// return Timeseries{
-	// 	Legend: []string{"geth"},
-	// 	XAxis: []ChartXAxis{
-	// 		{
-	// 			Type:       "category",
-	// 			BoundryGap: false,
-	// 			Data:       []string{"2023-11-25 02:30", "2023-11-25 03:00"},
-	// 		},
-	// 	},
-	// }
+	chartSeries := make([]ChartSeries, 0, len(timeseries))
+	legend := make([]string, 0, len(timeseries))
+
+	for key, series := range timeseries {
+		legend = append(legend, key)
+
+		chartSeries = append(chartSeries, ChartSeries{
+			Name:      key,
+			Type:      "line",
+			Stack:     "Total",
+			AreaStyle: struct{}{},
+			Emphasis: ChartSeriesEmphasis{
+				Focus: "series",
+			},
+			Data: series,
+		})
+	}
 
 	tsStr := make([]string, len(outTs))
 	for i, ts := range outTs {
 		tsStr[i] = ts.UTC().Format("2006-01-02 15:04")
 	}
 
+	slices.SortStableFunc(legend, strings.Compare)
+
 	return Timeseries{
-		Series: []ChartSeries{ss},
+		Legend: legend,
+		Series: chartSeries,
 		XAxis: []ChartXAxis{
 			{
 				Type:       "category",

@@ -526,12 +526,12 @@ func (db *DB) GetStats(ctx context.Context, after time.Time, before time.Time) (
 }
 
 type HistoryListRow struct {
-	NodeID     string
-	ClientName *string
-	NetworkID  *int64
-	CrawledAt  time.Time
-	Direction  string
-	Error      *string
+	NodeID           string
+	ClientIdentifier *string
+	NetworkID        *int64
+	CrawledAt        time.Time
+	Direction        string
+	Error            *string
 }
 
 func (r HistoryListRow) CrawledAtStr() string {
@@ -627,8 +627,7 @@ func (db *DB) GetHistoryList(
 		fmt.Sprintf(`
 			SELECT
 				history.node_id,
-				crawled.client_name,
-				crawled.client_user_data,
+				crawled.client_identifier,
 				crawled.network_id,
 				history.crawled_at,
 				history.direction,
@@ -686,12 +685,10 @@ func (db *DB) GetHistoryList(
 		row := HistoryListRow{}
 		nodeIDBytes := make([]byte, 32)
 		var crawledAtInt int64
-		var userData *string
 
 		err := rows.Scan(
 			&nodeIDBytes,
-			&row.ClientName,
-			&userData,
+			&row.ClientIdentifier,
 			&row.NetworkID,
 			&crawledAtInt,
 			&row.Direction,
@@ -703,12 +700,6 @@ func (db *DB) GetHistoryList(
 
 		row.NodeID = hex.EncodeToString(nodeIDBytes[:])
 		row.CrawledAt = time.Unix(crawledAtInt, 0)
-
-		if row.ClientName != nil && userData != nil {
-			newName := *row.ClientName + "/" + *userData
-			row.ClientName = &newName
-		}
-
 		historyList.Rows = append(historyList.Rows, row)
 	}
 
