@@ -165,6 +165,12 @@
               description = "Name of the file within the `stateDir` for storing the data for the crawler.";
             };
 
+            statsDatabaseName = mkOption {
+              type = types.str;
+              default = "stats.db";
+              description = "Name of the file within the `stateDir` for storing the stats for the crawler.";
+            };
+
             snapshotFilename = mkOption {
               type = types.str;
               default = "snapshots/crawler_20060102150405.db";
@@ -336,6 +342,7 @@
                     args = [
                       "--snapshot-name=${cfg.snapshotFilename}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
+                      "--stats-db=${cfg.statsDatabaseName}"
                       "--geoipdb=${cfg.crawler.geoipdb}"
                       "--metrics-addr=${cfg.crawler.metricsAddress}"
                       "--next-crawl-fail=${cfg.crawler.nextCrawlFail}"
@@ -373,6 +380,7 @@
                       "--api-addr=${apiAddress}"
                       "--snapshot-name=${cfg.snapshotFilename}"
                       "--crawler-db=${cfg.crawlerDatabaseName}"
+                      "--stats-db=${cfg.statsDatabaseName}"
                       "--enode=${cfg.api.enode}"
                       "--metrics-addr=${cfg.api.metricsAddress}"
                     ];
