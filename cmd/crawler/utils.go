@@ -61,7 +61,7 @@ func openDBWriter(cCtx *cli.Context, geoipDB *geoip2.Reader) (*database.DB, erro
 	}
 
 	// Setup stats DB
-	err = db.AttachStatsDB("stats.db")
+	err = db.AttachStatsDB(statsDBFlag.Get(cCtx))
 	if err != nil {
 		return nil, fmt.Errorf("attach stats failed: %w", err)
 	}
@@ -77,9 +77,9 @@ func openDBWriter(cCtx *cli.Context, geoipDB *geoip2.Reader) (*database.DB, erro
 		return nil, fmt.Errorf("setting status pragmas failed: %w", err)
 	}
 
-	err = db.CreateStatsTables()
+	err = db.MigrateStats()
 	if err != nil {
-		return nil, fmt.Errorf("create stats tables failed: %w", err)
+		return nil, fmt.Errorf("stats database migration failed: %w", err)
 	}
 
 	return db, nil
@@ -110,7 +110,7 @@ func openDBReader(cCtx *cli.Context) (*database.DB, error) {
 	}
 
 	// Setup stats DB
-	err = db.AttachStatsDB("stats.db")
+	err = db.AttachStatsDB(statsDBFlag.Get(cCtx))
 	if err != nil {
 		return nil, fmt.Errorf("attach stats failed: %w", err)
 	}

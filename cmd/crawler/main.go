@@ -17,18 +17,16 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
-	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/urfave/cli/v2"
 	_ "modernc.org/sqlite/lib"
 )
 
 var (
+	//nolint:exhaustruct
 	app = &cli.App{
 		Name:        filepath.Base(os.Args[0]),
 		Usage:       "go-ethereum crawler",
@@ -43,36 +41,10 @@ func init() {
 	app.Before = func(ctx *cli.Context) error {
 		return Setup(ctx)
 	}
-	// Add subcommands.
 	app.Commands = []*cli.Command{
 		apiCommand,
 		crawlerCommand,
 		printEnodeCommand,
-		{
-			Name: "migrate-db",
-			Action: func(ctx *cli.Context) error {
-				name := ctx.Args().Get(0)
-
-				sqlite, err := sql.Open("sqlite", name)
-				if err != nil {
-					return fmt.Errorf("open new db failed: %w", err)
-				}
-
-				db := database.NewDB(sqlite, nil, time.Second, time.Second, time.Second)
-
-				// err = db.CreateTables()
-				// if err != nil {
-				// 	return fmt.Errorf("create tables failed: %w", err)
-				// }
-
-				err = db.Migrate()
-				if err != nil {
-					return fmt.Errorf("migrate failed: %w", err)
-				}
-
-				return nil
-			},
-		},
 	}
 }
 

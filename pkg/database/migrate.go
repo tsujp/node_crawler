@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"slices"
@@ -10,20 +11,49 @@ import (
 	"github.com/ethereum/node-crawler/pkg/common"
 )
 
-var migrations = []func(tx *sql.Tx) error{
-	migration000Schema,
-	migration001CrawledNodes,
-	migration002ENRBlob,
-}
+type migrationFn func(*sql.Tx) error
 
 func (db *DB) Migrate() error {
-	tx, err := db.db.Begin()
+	conn, err := db.db.Conn(context.Background())
+	if err != nil {
+		return fmt.Errorf("get conn failed: %w", err)
+	}
+
+	return migrate(
+		conn,
+		"main",
+		[]migrationFn{
+			migration000Schema,
+			migration001CrawledNodes,
+			migration002ENRBlob,
+		},
+		migrateIndexes,
+	)
+}
+
+func migrate(
+	conn *sql.Conn,
+	database string,
+	migrations []migrationFn,
+	staticObjects migrationFn,
+) error {
+	tx, err := conn.BeginTx(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction failed: %w", err)
 	}
 	defer tx.Rollback()
 
-	schemaVersions, err := schemaVersions(tx)
+	_, err = tx.Exec(fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s.schema_versions (
+			version		INTEGER	PRIMARY KEY,
+			timestamp	INTEGER	NOT NULL
+		);
+	`, database))
+	if err != nil {
+		return fmt.Errorf("creating schema version table failed: %w", err)
+	}
+
+	schemaVersions, err := schemaVersions(tx, database)
 	if err != nil {
 		return fmt.Errorf("selecting schema version failed: %w", err)
 	}
@@ -38,25 +68,33 @@ func (db *DB) Migrate() error {
 		migrationRan = true
 
 		start := time.Now()
-		log.Info("running migration", "version", version)
+		log.Info("running migration", "database", database, "version", version)
 
 		err := migration(tx)
 		if err != nil {
 			return fmt.Errorf("migration (%d) failed: %w", version, err)
 		}
 
-		tx.Exec(`
-			INSERT INTO schema_versions (
-				version, timestamp
-			) VALUES (
-				?, unixepoch()
-			)
-		`, version)
+		tx.Exec(
+			fmt.Sprintf(`
+				INSERT INTO %s.schema_versions (
+					version, timestamp
+				) VALUES (
+					?, unixepoch()
+				)
+			`, database),
+			version,
+		)
 
-		log.Info("migration complete", "version", version, "duration", time.Since(start))
+		log.Info(
+			"migration complete",
+			"database", database,
+			"version", version,
+			"duration", time.Since(start),
+		)
 	}
 
-	err = migrateIndexes(tx)
+	err = staticObjects(tx)
 	if err != nil {
 		return fmt.Errorf("create indexes failed: %w", err)
 	}
@@ -68,14 +106,21 @@ func (db *DB) Migrate() error {
 
 	if migrationRan {
 		start := time.Now()
-		log.Info("running vacuum")
+		log.Info("running vacuum", "database", database)
 
-		_, err = db.db.Exec("VACUUM")
+		_, err = conn.ExecContext(
+			context.Background(),
+			fmt.Sprintf("VACUUM %s", database),
+		)
 		if err != nil {
 			return fmt.Errorf("vacuum failed: %w", err)
 		}
 
-		log.Info("vacuum done", "duration", time.Since(start))
+		log.Info(
+			"vacuum done",
+			"database", database,
+			"duration", time.Since(start),
+		)
 	}
 
 	return nil
@@ -94,8 +139,11 @@ func (s schemaVersionSlice) Exists(i int) bool {
 	})
 }
 
-func schemaVersions(tx *sql.Tx) (schemaVersionSlice, error) {
-	rows, err := tx.Query("SELECT version, timestamp FROM schema_versions")
+func schemaVersions(tx *sql.Tx, database string) (schemaVersionSlice, error) {
+	rows, err := tx.Query(fmt.Sprintf(
+		"SELECT version, timestamp FROM %s.schema_versions",
+		database,
+	))
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %w", err)
 	}
@@ -159,11 +207,6 @@ func migrateIndexes(tx *sql.Tx) error {
 
 func migration000Schema(tx *sql.Tx) error {
 	_, err := tx.Exec(`
-		CREATE TABLE schema_versions (
-			version		INTEGER	PRIMARY KEY,
-			timestamp	INTEGER	NOT NULL
-		);
-
 		CREATE TABLE discovered_nodes (
 			node_id			BLOB	PRIMARY KEY,
 			network_address	TEXT	NOT NULL,
@@ -217,7 +260,7 @@ func migration000Schema(tx *sql.Tx) error {
 		) STRICT;
 	`)
 	if err != nil {
-		return fmt.Errorf("create schema failed: %w", err)
+		return fmt.Errorf("create initial schema failed: %w", err)
 	}
 
 	return nil
@@ -229,12 +272,34 @@ func migration001CrawledNodes(tx *sql.Tx) error {
 		return fmt.Errorf("error renaming table: %w", err)
 	}
 
-	_, err = tx.Exec(
-		`
-		`,
-	)
+	_, err = tx.Exec(`
+		CREATE TABLE crawled_nodes (
+			node_id				BLOB	PRIMARY KEY,
+			updated_at			INTEGER	NOT NULL,
+			client_identifier	TEXT	DEFAULT NULL,
+			client_name			TEXT	DEFAULT NULL,
+			client_user_data	TEXT	DEFAULT NULL,
+			client_version		TEXT	DEFAULT NULL,
+			client_build		TEXT	DEFAULT NULL,
+			client_os			TEXT	DEFAULT NULL,
+			client_arch			TEXT	DEFAULT NULL,
+			client_language		TEXT	DEFAULT NULL,
+			rlpx_version		INTEGER	DEFAULT NULL,
+			capabilities		TEXT	DEFAULT NULL,
+			network_id			INTEGER	DEFAULT NULL,
+			fork_id				INTEGER	DEFAULT NULL,
+			next_fork_id		INTEGER	DEFAULT NULL,
+			head_hash			BLOB	DEFAULT NULL,
+			ip_address			TEXT	DEFAULT NULL,
+			connection_type		TEXT	DEFAULT NULL,
+			country				TEXT	DEFAULT NULL,
+			city				TEXT	DEFAULT NULL,
+			latitude			REAL	DEFAULT NULL,
+			longitude			REAL	DEFAULT NULL
+		) STRICT;
+	`)
 	if err != nil {
-		return fmt.Errorf("create schema failed: %w", err)
+		return fmt.Errorf("create new table failed: %w", err)
 	}
 
 	rows, err := tx.Query(`

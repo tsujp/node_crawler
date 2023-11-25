@@ -8,11 +8,6 @@ import (
 )
 
 var (
-	apiDBFlag = cli.StringFlag{
-		Name:     "api-db",
-		Usage:    "API SQLite file name",
-		Required: true,
-	}
 	apiListenAddrFlag = cli.StringFlag{
 		Name:  "api-addr",
 		Usage: "Listening address",
@@ -44,6 +39,11 @@ var (
 	crawlerDBFlag = cli.StringFlag{
 		Name:     "crawler-db",
 		Usage:    "Crawler SQLite file name",
+		Required: true,
+	}
+	statsDBFlag = cli.StringFlag{
+		Name:     "stats-db",
+		Usage:    "Stats SQLite file name",
 		Required: true,
 	}
 	dropNodesTimeFlag = cli.DurationFlag{

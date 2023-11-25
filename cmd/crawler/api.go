@@ -21,12 +21,13 @@ var (
 		Action: startAPI,
 		Flags: []cli.Flag{
 			&apiListenAddrFlag,
-			&snapshotFilenameFlag,
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
 			&dropNodesTimeFlag,
 			&enodeFlag,
 			&metricsAddressFlag,
+			&snapshotFilenameFlag,
+			&statsDBFlag,
 			&statsUpdateFrequencyFlag,
 		},
 	}

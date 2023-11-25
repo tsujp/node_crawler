@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/a-h/templ"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/ethereum/node-crawler/public"
@@ -26,7 +27,7 @@ type API struct {
 	snapshotDir          string
 
 	stats     database.AllStats
-	statsLock sync.Mutex
+	statsLock sync.RWMutex
 }
 
 func New(
@@ -42,7 +43,7 @@ func New(
 		snapshotDir:          snapshotDir,
 
 		stats:     database.AllStats{},
-		statsLock: sync.Mutex{},
+		statsLock: sync.RWMutex{},
 	}
 
 	go api.statsUpdaterDaemon()
@@ -58,8 +59,8 @@ func (a *API) replaceStats(newStats database.AllStats) {
 }
 
 func (a *API) getStats() database.AllStats {
-	a.statsLock.Lock()
-	defer a.statsLock.Unlock()
+	a.statsLock.RLock()
+	defer a.statsLock.RUnlock()
 
 	return a.stats
 }
@@ -72,7 +73,16 @@ func (a *API) statsUpdaterDaemon() {
 
 		log.Debug("updating stats...")
 
-		stats, err := a.db.GetStats(context.Background())
+		deleteBeforeTs := start.AddDate(0, 0, -7)
+		afterTs := deleteBeforeTs
+
+		oldStats := a.getStats()
+
+		if len(oldStats) > 0 {
+			afterTs = oldStats[len(oldStats)-1].Timestamp
+		}
+
+		stats, err := a.db.GetStats(context.Background(), afterTs, start)
 		if err != nil {
 			log.Error("stats updater daemon: get stats failed", "err", err)
 			time.Sleep(time.Minute)
@@ -80,7 +90,15 @@ func (a *API) statsUpdaterDaemon() {
 			continue
 		}
 
-		a.replaceStats(stats)
+		oldStats = append(oldStats, stats...)
+
+		for i, stat := range oldStats {
+			if stat.Timestamp.After(deleteBeforeTs) {
+				a.replaceStats(oldStats[i:])
+
+				break
+			}
+		}
 
 		log.Debug("stats updated", "next", nextLoop, "took", time.Since(start))
 
@@ -301,7 +319,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats := a.getStats().Filter(
+	allStats := a.getStats().Filter(
 		func(_ int, s database.Stats) bool {
 			if networkID == -1 {
 				return true
@@ -328,21 +346,29 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		},
 		func(_ int, s database.Stats) bool {
 			return synced == -1 ||
-				(synced == 1 && s.Synced == "Yes") ||
-				(synced == 0 && s.Synced == "No")
+				(synced == 1 && s.Synced) ||
+				(synced == 0 && !s.Synced)
 		},
 	)
 
 	reqURL := public.URLFromReq(r)
 
+	clientNames := allStats.CountClientName()
+	countries := allStats.GroupCountries()
+	OSs := allStats.GroupOS()
+
 	statsPage := public.Stats(
 		reqURL,
 		networkID,
 		synced,
-		public.StatsGroup("Client Names", stats.CountClientName()),
-		public.StatsGroup("Countries", stats.GroupCountries().Limit(20)),
-		public.StatsGroup("OS / Archetectures", stats.GroupOS()),
-		// public.StatsGroup("Languages", stats.GroupLanguage()),
+		[]templ.Component{
+			public.StatsGraph("Client Names", clientNames.ClientNameTimeseries()),
+		},
+		[]templ.Component{
+			public.StatsGroup("Client Names", clientNames.Last()),
+			public.StatsGroup("Countries", countries.Last().Limit(20)),
+			public.StatsGroup("OS / Archetectures", OSs.Last()),
+		},
 	)
 
 	index := public.Index(reqURL, statsPage, networkID, synced)

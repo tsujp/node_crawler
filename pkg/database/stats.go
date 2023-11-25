@@ -31,18 +31,6 @@ func (db *DB) AttachStatsDB(filename string) error {
 	return nil
 }
 
-//go:embed sql/stats.sql
-var statsSchema string
-
-func (db *DB) CreateStatsTables() error {
-	_, err := db.statsConn.ExecContext(context.Background(), statsSchema)
-	if err != nil {
-		return fmt.Errorf("creating schema failed: %w", err)
-	}
-
-	return nil
-}
-
 // Meant to be run as a goroutine.
 //
 // Copies the stats into the stats table every `frequency` duration.
@@ -72,6 +60,7 @@ func (db *DB) CopyStats() error {
 			SELECT
 				unixepoch() timestamp,
 				crawled.client_name,
+				crawled.client_user_data,
 				crawled.client_version,
 				crawled.client_os,
 				crawled.client_arch,
@@ -111,6 +100,7 @@ func (db *DB) CopyStats() error {
 				disc.last_found > unixepoch('now', '-24 hours')
 			GROUP BY
 				crawled.client_name,
+				crawled.client_user_data,
 				crawled.client_version,
 				crawled.client_os,
 				crawled.client_arch,
@@ -129,12 +119,15 @@ func (db *DB) CopyStats() error {
 }
 
 type Stats struct {
-	Client     Client
-	NetworkID  *int64
-	ForkID     *uint32
-	NextForkID *uint64
-	Country    *string
-	Synced     string
+	Timestamp   time.Time
+	Client      Client
+	NetworkID   *int64
+	ForkID      *uint32
+	NextForkID  *uint64
+	Country     *string
+	Synced      bool
+	DialSuccess bool
+	Total       int64
 }
 
 func (s Stats) CountryStr() string {
@@ -149,6 +142,22 @@ type AllStats []Stats
 
 type KeyFn func(Stats) string
 type StatsFilterFn func(int, Stats) bool
+
+func (s AllStats) LastStats() AllStats {
+	if len(s) == 0 {
+		return AllStats{}
+	}
+
+	lastTs := s[len(s)-1].Timestamp
+
+	for i := len(s) - 1; i > 0; i-- {
+		if s[i].Timestamp != lastTs {
+			return s[i:]
+		}
+	}
+
+	return s
+}
 
 func (s AllStats) Filter(filters ...StatsFilterFn) AllStats {
 	out := make(AllStats, 0, len(s))
@@ -170,55 +179,213 @@ func (s AllStats) Filter(filters ...StatsFilterFn) AllStats {
 	return out
 }
 
-func (s AllStats) GroupBy(keyFn KeyFn, filters ...StatsFilterFn) CountTotal {
-	count := map[string]int{}
+func (s AllStats) GroupBy(keyFn KeyFn, filters ...StatsFilterFn) AllCountTotal {
+	allCount := map[time.Time]map[string]int64{}
 
 	for _, stat := range s.Filter(filters...) {
+		ts := stat.Timestamp
 		key := keyFn(stat)
 
-		v, ok := count[key]
+		_, ok := allCount[ts]
+		if !ok {
+			allCount[ts] = map[string]int64{}
+		}
+
+		v, ok := allCount[ts][key]
 		if !ok {
 			v = 0
 		}
 
-		v += 1
-		count[key] = v
+		v += stat.Total
+		allCount[ts][key] = v
 	}
 
-	out := make([]Count, 0, len(count))
-	total := 0
+	// 7 days * 24 hours * 2 stats per hour
+	allOut := make([]CountTotal, 0, len(allCount))
 
-	for key, value := range count {
-		out = append(out, Count{
-			Key:   key,
-			Count: value,
-		})
+	for ts, count := range allCount {
+		out := make([]Count, 0, len(count))
+		var total int64 = 0
 
-		total += value
-	}
+		for key, value := range count {
+			out = append(out, Count{
+				Key:   key,
+				Count: value,
+			})
 
-	slices.SortFunc(out, func(a, b Count) int {
-		if a.Count == b.Count {
-			return strings.Compare(b.Key, a.Key)
+			total += value
 		}
 
-		return b.Count - a.Count
+		slices.SortFunc(out, func(a, b Count) int {
+			if a.Count == b.Count {
+				return strings.Compare(b.Key, a.Key)
+			}
+
+			return int(b.Count - a.Count)
+		})
+
+		allOut = append(allOut, CountTotal{
+			Timestamp: ts,
+			Values:    out,
+			Total:     total,
+		})
+	}
+
+	slices.SortFunc(allOut, func(a, b CountTotal) int {
+		return a.Timestamp.Compare(b.Timestamp)
 	})
 
-	return CountTotal{
-		Values: out,
-		Total:  total,
-	}
+	return allOut
 }
 
 type Count struct {
 	Key   string
-	Count int
+	Count int64
 }
 
 type CountTotal struct {
-	Values []Count
-	Total  int
+	Timestamp time.Time
+	Values    []Count
+	Total     int64
+}
+
+type AllCountTotal []CountTotal
+
+func (s AllCountTotal) Last() CountTotal {
+	if len(s) == 0 {
+		return CountTotal{
+			Values: []Count{},
+			Total:  0,
+		}
+	}
+
+	return s[len(s)-1]
+}
+
+type ChartSeriesEmphasis struct {
+	Focus string `json:"focus"`
+}
+
+type ChartXAxis struct {
+	Type       string   `json:"type"`
+	BoundryGap bool     `json:"boundryGap"`
+	Data       []string `json:"data"`
+}
+
+type ChartSeries struct {
+	Name      string              `json:"name"`
+	Type      string              `json:"type"`
+	Stack     string              `json:"stack"`
+	AreaStyle struct{}            `json:"areaStyle"`
+	Emphasis  ChartSeriesEmphasis `json:"emphasis"`
+	Data      []*float64          `json:"data"`
+}
+
+type Timeseries struct {
+	Legend []string      `json:"legend"`
+	Series []ChartSeries `json:"series"`
+	XAxis  []ChartXAxis  `json:"xAxis"`
+}
+
+func newFloat(i int64) *float64 {
+	f := float64(i)
+	return &f
+}
+
+func (s AllCountTotal) ClientNameTimeseries() Timeseries {
+	timestampMap := map[time.Time]struct{}{}
+
+	for _, c := range s {
+		timestampMap[c.Timestamp] = struct{}{}
+	}
+
+	timestamps := make([]time.Time, 0, len(timestampMap))
+
+	for ts := range timestampMap {
+		timestamps = append(timestamps, ts)
+	}
+
+	slices.SortFunc(timestamps, func(a, b time.Time) int {
+		return a.Compare(b)
+	})
+
+	outTs := make([]time.Time, 0, len(timestamps))
+
+	if len(timestamps) > 0 {
+		lastTs := timestamps[0]
+		outTs = append(outTs, lastTs)
+
+		for _, ts := range timestamps[1:] {
+			for {
+				if lastTs.Sub(ts).Abs() > 35*time.Minute {
+					lastTs = lastTs.Add(30 * time.Minute)
+					outTs = append(outTs, lastTs)
+				} else {
+					outTs = append(outTs, ts)
+					lastTs = ts
+
+					break
+				}
+			}
+		}
+	}
+
+	ss := ChartSeries{
+		Name:      "geth",
+		Type:      "line",
+		Stack:     "Total",
+		AreaStyle: struct{}{},
+		Emphasis: ChartSeriesEmphasis{
+			Focus: "series",
+		},
+		Data: make([]*float64, 0, len(outTs)),
+	}
+
+	for _, ts := range outTs {
+		for _, e := range s {
+			log.Info("ts", "ts", ts, "ts2", e.Timestamp)
+			if e.Timestamp.Equal(ts) {
+				log.Info("match", "ts", ts, "ts2", e.Timestamp)
+				for _, ee := range e.Values {
+					log.Info("values", "key", ee.Key)
+					if ee.Key == "geth" {
+						ss.Data = append(ss.Data, newFloat(ee.Count))
+
+						break
+					}
+
+					ss.Data = append(ss.Data, nil)
+				}
+			}
+		}
+	}
+
+	// return Timeseries{
+	// 	Legend: []string{"geth"},
+	// 	XAxis: []ChartXAxis{
+	// 		{
+	// 			Type:       "category",
+	// 			BoundryGap: false,
+	// 			Data:       []string{"2023-11-25 02:30", "2023-11-25 03:00"},
+	// 		},
+	// 	},
+	// }
+
+	tsStr := make([]string, len(outTs))
+	for i, ts := range outTs {
+		tsStr[i] = ts.UTC().Format("2006-01-02 15:04")
+	}
+
+	return Timeseries{
+		Series: []ChartSeries{ss},
+		XAxis: []ChartXAxis{
+			{
+				Type:       "category",
+				BoundryGap: false,
+				Data:       tsStr,
+			},
+		},
+	}
 }
 
 func (t CountTotal) Limit(limit int) CountTotal {
@@ -239,7 +406,7 @@ func (t CountTotal) OrderBy(orderByFn CountTotalOrderFn) CountTotal {
 	}
 }
 
-func (s AllStats) CountClientName(filters ...StatsFilterFn) CountTotal {
+func (s AllStats) CountClientName(filters ...StatsFilterFn) AllCountTotal {
 	return s.GroupBy(
 		func(s Stats) string {
 			return s.Client.Name
@@ -248,7 +415,7 @@ func (s AllStats) CountClientName(filters ...StatsFilterFn) CountTotal {
 	)
 }
 
-func (s AllStats) GroupCountries(filters ...StatsFilterFn) CountTotal {
+func (s AllStats) GroupCountries(filters ...StatsFilterFn) AllCountTotal {
 	return s.GroupBy(
 		func(s Stats) string {
 			return s.CountryStr()
@@ -257,7 +424,7 @@ func (s AllStats) GroupCountries(filters ...StatsFilterFn) CountTotal {
 	)
 }
 
-func (s AllStats) GroupOS(filters ...StatsFilterFn) CountTotal {
+func (s AllStats) GroupOS(filters ...StatsFilterFn) AllCountTotal {
 	return s.GroupBy(
 		func(s Stats) string {
 			return s.Client.OS + " / " + s.Client.Arch
@@ -266,7 +433,7 @@ func (s AllStats) GroupOS(filters ...StatsFilterFn) CountTotal {
 	)
 }
 
-func (s AllStats) GroupArch(filters ...StatsFilterFn) CountTotal {
+func (s AllStats) GroupArch(filters ...StatsFilterFn) AllCountTotal {
 	return s.GroupBy(
 		func(s Stats) string {
 			return s.Client.Arch
@@ -275,7 +442,7 @@ func (s AllStats) GroupArch(filters ...StatsFilterFn) CountTotal {
 	)
 }
 
-func (s AllStats) GroupLanguage(filters ...StatsFilterFn) CountTotal {
+func (s AllStats) GroupLanguage(filters ...StatsFilterFn) AllCountTotal {
 	return s.GroupBy(
 		func(s Stats) string {
 			return s.Client.Language

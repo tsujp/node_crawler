@@ -631,28 +631,84 @@ templ SyncedFilterLinks(url URL, synced int) {
 	</div>
 }
 
-templ Stats(reqURL URL, networkID int64, synced int, stats ...templ.Component) {
+templ Stats(reqURL URL, networkID int64, synced int, charts []templ.Component, stats []templ.Component) {
 	<div style="display: flex; flex-direction: column; padding: 1em; gap: 1em;">
 		@NetworkFilterLinks(reqURL.WithPath("/"), networkID)
 		@SyncedFilterLinks(reqURL, synced)
+
+		<div style="display: flex; flex-direction: row; gap: 1em; flex-wrap: wrap;">
+			for _, chart := range charts {
+				{! chart }
+			}
+		</div>
+
 		<div style="display: flex; flex-direction: row; gap: 1em; flex-wrap: wrap;">
 			for _, stat := range stats {
 				{! stat }
 			}
 		</div>
+
 		<span style="align-self: flex-end;">Only shows nodes which were last found via discovery in the last 24 hours</span>
 	</div>
+}
+
+script statsGraph(id string, ts database.Timeseries) {
+	let chart = echarts.init(document.getElementById(id), 'dark');
+	chart.setOption({
+		title: {
+	    text: 'Stacked Area Chart'
+	  },
+	  tooltip: {
+	    trigger: 'axis',
+	    axisPointer: {
+	      type: 'cross',
+	      label: {
+	        backgroundColor: '#6a7985'
+	      }
+	    }
+	  },
+	  legend: {
+	    data: ts.legend,
+	  },
+	  toolbox: {
+	    feature: {
+	      saveAsImage: {}
+	    }
+	  },
+	  grid: {
+	    left: '3%',
+	    right: '4%',
+	    bottom: '3%',
+	    containLabel: true
+	  },
+	  xAxis: ts.xAxis,
+	  yAxis: [
+	    {
+	      type: 'value'
+	    }
+	  ],
+	  series: ts.series,
+	});
+
+	window.addEventListener('resize', function() {
+	  myChart.resize();
+	});
+}
+
+templ StatsGraph(id string, ts database.Timeseries) {
+	<div class="chart" id={ id }></div>
+	@statsGraph(id, ts)
 }
 
 templ StatsGroup(name string, stats database.CountTotal) {
 	<div style="display: flex; flex-direction: column; border: 1px solid orange; border-radius: 1em; padding: 1em; flex-grow: 1; min-width: 30%;">
 		<h2>{ name }</h2>
 		<div style="background-color: #333; padding: 0.5em 0; width: 100%;">
-			<span style="padding-inline-start: 0.5em; white-space: nowrap;">Total ({ strconv.Itoa(stats.Total) })</span>
+			<span style="padding-inline-start: 0.5em; white-space: nowrap;">Total ({ strconv.FormatInt(stats.Total, 10) })</span>
 		</div>
 		for _, stat := range stats.Values {
 			<div STYLE_REPLACE={ fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", stat.Count*100/stats.Total) }>
-				<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ stat.Key } ({ strconv.Itoa(stat.Count) })</span>
+				<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ stat.Key } ({ strconv.FormatInt(stat.Count, 10) })</span>
 			</div>
 		}
 	</div>
@@ -666,7 +722,9 @@ templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 
 			<meta property="og:title" content="Ethernets - Node Crawler" />
 			<meta property="og:description" content="Ethereum network crawler." />
-			<meta property="og:image" content="/favicon.ico" />
+			<meta property="og:image" content="https://ethereum.org/static/b135b7f22d4d74f3e8566221b1079cf3/fd8d9/eth-diamond-purple.png" />
+
+			<script src="https://unpkg.com/echarts@5.4.3/dist/echarts.min.js"></script>
 
 			<style type="text/css">
 				html, body {
@@ -674,6 +732,10 @@ templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 					background-color: #111;
 					color: #eee;
 				}
+				.chart {
+			    width: 100%;
+			    height: 400px;
+			  }
 				a:link {
 					color: #eee;
 				}

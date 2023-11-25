@@ -26,7 +26,6 @@ import (
 	"github.com/oschwald/geoip2-golang"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/node-crawler/pkg/crawlerv2"
 	"github.com/ethereum/node-crawler/pkg/disc"
@@ -57,12 +56,9 @@ var (
 			&nodedbFlag,
 			&snapshotFilenameFlag,
 			&statsCopyFrequencyFlag,
+			&statsDBFlag,
 			&timeoutFlag,
 			&workersFlag,
-			utils.GoerliFlag,
-			utils.HoleskyFlag,
-			utils.NetworkIdFlag,
-			utils.SepoliaFlag,
 		},
 	}
 )

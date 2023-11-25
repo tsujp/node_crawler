@@ -441,39 +441,41 @@ func (db *DB) GetNodeList(
 	return &out, nil
 }
 
-func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
+func (db *DB) GetStats(ctx context.Context, after time.Time, before time.Time) (AllStats, error) {
 	var err error
 
 	start := time.Now()
 	defer metrics.ObserveDBQuery("get_stats", start, err)
 
-	rows, err := db.db.QueryContext(
+	rows, err := db.statsConn.QueryContext(
 		ctx,
 		`
 			SELECT
-				crawled.client_name,
-				crawled.client_user_data,
-				crawled.client_version,
-				crawled.client_os,
-				crawled.client_arch,
-				crawled.network_id,
-				crawled.fork_id,
-				crawled.next_fork_id,
-				crawled.country,
-				crawled.updated_at,
-				blocks.timestamp
-			FROM discovered_nodes AS disc
-			LEFT JOIN crawled_nodes AS crawled ON (
-				disc.node_id = crawled.node_id
-			)
-			LEFT JOIN blocks ON (
-				crawled.head_hash = blocks.block_hash
-				AND crawled.network_id = blocks.network_id
-			)
+				timestamp,
+				client_name,
+				client_user_data,
+				client_version,
+				client_os,
+				client_arch,
+				network_id,
+				fork_id,
+				next_fork_id,
+				country,
+				synced,
+				dial_success,
+				total
+			FROM stats.crawled_nodes
 			WHERE
-				disc.last_found > unixepoch('now', '-24 hours')
-				AND crawled.client_identifier IS NOT NULL
+				timestamp > ?1
+				AND timestamp < ?2
+			ORDER BY
+				timestamp ASC,
+				total DESC,
+				client_name ASC,
+				client_version ASC
 		`,
+		after.Unix(),
+		before.Unix(),
 	)
 	if err != nil {
 		return AllStats{}, fmt.Errorf("query failed: %w", err)
@@ -485,9 +487,10 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 	for rows.Next() {
 		stats := Stats{}
 		var clientName, clientUserData, clientVersion, clientOS, clientArch *string
-		var updatedAtInt, blockTimestampInt *int64
+		var timestamp int64
 
 		err := rows.Scan(
+			&timestamp,
 			&clientName,
 			&clientUserData,
 			&clientVersion,
@@ -497,17 +500,16 @@ func (db *DB) GetStats(ctx context.Context) (AllStats, error) {
 			&stats.ForkID,
 			&stats.NextForkID,
 			&stats.Country,
-			&updatedAtInt,
-			&blockTimestampInt,
+			&stats.Synced,
+			&stats.DialSuccess,
+			&stats.Total,
 		)
 		if err != nil {
 			return AllStats{}, fmt.Errorf("scan failed: %w", err)
 		}
 
-		updatedAt := int64PrtToTimePtr(updatedAtInt)
-		blockTimestamp := int64PrtToTimePtr(blockTimestampInt)
+		stats.Timestamp = time.Unix(timestamp, 0)
 
-		stats.Synced = isSynced(updatedAt, blockTimestamp)
 		stats.Client = New(
 			clientName,
 			clientUserData,
