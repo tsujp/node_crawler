@@ -692,9 +692,7 @@ script statsGraph(title string, id string, ts database.Timeseries) {
 	  series: ts.series,
 	});
 
-	window.addEventListener('resize', function() {
-	  myChart.resize();
-	});
+	window.addEventListener('resize', chart.resize);
 }
 
 templ StatsGraph(title string, id string, ts database.Timeseries) {
