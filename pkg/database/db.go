@@ -76,11 +76,11 @@ func (db *DB) getTableStats() (*tableStats, error) {
 			(SELECT COUNT(*) FROM blocks),
 			(
 				SELECT page_count * page_size
-				FROM pragma_page_count(), pragma_page_size()
+				FROM pragma_page_count('main'), pragma_page_size('main')
 			),
 			(
 				SELECT page_count * page_size
-				FROM stats.pragma_page_count(), stats.pragma_page_size()
+				FROM pragma_page_count('stats'), pragma_page_size('stats')
 			)
 	`)
 	if err != nil {
