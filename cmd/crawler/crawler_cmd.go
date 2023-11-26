@@ -44,6 +44,8 @@ var (
 			&bootnodesFlag,
 			&busyTimeoutFlag,
 			&crawlerDBFlag,
+			&snapshotDirFlag,
+			&crawlerSnapshotFlag,
 			&geoipdbFlag,
 			&listenAddrFlag,
 			&metricsAddressFlag,
@@ -54,9 +56,9 @@ var (
 			&nodeKeyFileFlag,
 			&nodeURLFlag,
 			&nodedbFlag,
-			&snapshotFilenameFlag,
 			&statsCopyFrequencyFlag,
 			&statsDBFlag,
+			&statsSnapshotFlag,
 			&timeoutFlag,
 			&workersFlag,
 		},
@@ -95,7 +97,16 @@ func crawlNodesV2(cCtx *cli.Context) error {
 	defer db.Close()
 
 	go db.TableStatsMetricsDaemon(5 * time.Minute)
-	go db.SnapshotDaemon(snapshotFilenameFlag.Get(cCtx))
+	go db.SnapshotDaemon(
+		"main",
+		snapshotDirFlag.Get(cCtx),
+		crawlerSnapshotFlag.Get(cCtx),
+	)
+	go db.SnapshotDaemon(
+		"stats",
+		snapshotDirFlag.Get(cCtx),
+		statsSnapshotFlag.Get(cCtx),
+	)
 	go db.CleanerDaemon(15 * time.Minute)
 	go db.CopyStatsDaemon(statsCopyFrequencyFlag.Get(cCtx))
 

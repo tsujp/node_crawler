@@ -8,6 +8,7 @@ import (
 )
 
 var (
+	//nolint:exhaustruct
 	printEnodeCommand = &cli.Command{
 		Name:      "print-enode",
 		Usage:     "Print the enode given the node key file",

@@ -20,10 +20,20 @@ var (
 			"https://www.sqlite.org/pragma.html#pragma_auto_vacuum"),
 		Value: "INCREMENTAL",
 	}
-	snapshotFilenameFlag = cli.StringFlag{
-		Name:  "snapshot-name",
-		Usage: "Snapshot name. Passed to time.Format.",
-		Value: "snapshots/crawler_20060102150405.db",
+	snapshotDirFlag = cli.StringFlag{
+		Name:  "snapshot-dir",
+		Usage: "Snapshot directory.",
+		Value: "snapshots",
+	}
+	crawlerSnapshotFlag = cli.StringFlag{
+		Name:  "crawler-snapshot",
+		Usage: "Snapshot name for the crawler database. Passed to time.Format.",
+		Value: "crawler_20060102150405.db",
+	}
+	statsSnapshotFlag = cli.StringFlag{
+		Name:  "stats-snapshot",
+		Usage: "Snapshot name for the stats database. Passed to time.Format.",
+		Value: "stats_20060102150405.db",
 	}
 	bootnodesFlag = cli.StringSliceFlag{
 		Name: "bootnodes",

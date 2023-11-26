@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package crawler
+package crawlerv2
 
 import (
 	"crypto/ecdsa"
@@ -155,7 +155,7 @@ type Conn struct {
 	caps                       []p2p.Cap
 }
 
-// Read reads an eth66 packet from the connection.
+// Read reads an eth68 packet from the connection.
 func (c *Conn) Read() Message {
 	code, rawData, _, err := c.Conn.Read()
 	if err != nil {

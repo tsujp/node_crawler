@@ -1,3 +1,4 @@
+//nolint:exhaustruct
 package main
 
 import (

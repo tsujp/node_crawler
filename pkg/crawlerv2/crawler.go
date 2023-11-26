@@ -16,25 +16,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/node-crawler/pkg/common"
-	"github.com/ethereum/node-crawler/pkg/crawler"
 	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/ethereum/node-crawler/pkg/fifomemory"
 	"github.com/ethereum/node-crawler/pkg/metrics"
 )
-
-func nodeIDString(start string, c byte) string {
-	out := make([]byte, 64)
-
-	for i, r := range []byte(start) {
-		out[i] = r
-	}
-
-	for i := len(start); i < 64; i++ {
-		out[i] = c
-	}
-
-	return string(out)
-}
 
 type CrawlerV2 struct {
 	db         *database.DB
@@ -102,11 +87,11 @@ func (c *CrawlerV2) nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.
 }
 
 func (c *CrawlerV2) getClientInfo(
-	conn *crawler.Conn,
+	conn *Conn,
 	node *enode.Node,
 	direction string,
 ) {
-	err := crawler.WriteHello(conn, c.nodeKey)
+	err := writeHello(conn, c.nodeKey)
 	if err != nil {
 		known, errStr := translateError(err)
 		if !known {
@@ -123,8 +108,8 @@ func (c *CrawlerV2) getClientInfo(
 		return
 	}
 
-	var disconnect *crawler.Disconnect = nil
-	var readError *crawler.Error = nil
+	var disconnect *Disconnect = nil
+	var readError *Error = nil
 
 	nodeJSON := common.NodeJSON{
 		N:         node,
@@ -135,18 +120,20 @@ func (c *CrawlerV2) getClientInfo(
 
 	gotStatus := false
 	gotBlocks := 0
+
 	getBlocks := 1
 
 	for {
 		switch msg := conn.Read().(type) {
-		case *crawler.Ping:
-			_ = conn.Write(crawler.Pong{})
-		case *crawler.Pong:
+		case *Ping:
+			_ = conn.Write(Pong{})
+		case *Pong:
 			continue
-		case *crawler.Hello:
+		case *Hello:
 			if msg.Version >= 5 {
 				conn.SetSnappy(true)
 			}
+
 			nodeJSON.Info.Capabilities = msg.Caps
 			nodeJSON.Info.RLPxVersion = msg.Version
 			nodeJSON.Info.ClientName = msg.Name
@@ -156,18 +143,18 @@ func (c *CrawlerV2) getClientInfo(
 			if conn.NegotiatedProtoVersion == 0 {
 				nodeJSON.Error = "not eth node"
 				nodeJSON.EthNode = false
-				_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscUselessPeer})
+				_ = conn.Write(Disconnect{Reason: p2p.DiscUselessPeer})
 
 				goto loopExit
 			}
-		case *crawler.Status:
+		case *Status:
 			gotStatus = true
 
 			nodeJSON.Info.ForkID = msg.ForkID
 			nodeJSON.Info.HeadHash = msg.Head
 			nodeJSON.Info.NetworkID = msg.NetworkID
 
-			_ = conn.Write(crawler.Status{
+			_ = conn.Write(Status{
 				ProtocolVersion: msg.ProtocolVersion,
 				NetworkID:       msg.NetworkID,
 				TD:              msg.TD,
@@ -184,7 +171,7 @@ func (c *CrawlerV2) getClientInfo(
 			if getBlock != nil {
 				getBlocks = 2
 
-				_ = conn.Write(crawler.GetBlockHeaders{
+				_ = conn.Write(GetBlockHeaders{
 					RequestId: 69419,
 					GetBlockHeadersRequest: &eth.GetBlockHeadersRequest{
 						Origin:  eth.HashOrNumber{Hash: *getBlock},
@@ -195,7 +182,7 @@ func (c *CrawlerV2) getClientInfo(
 				})
 			}
 
-			_ = conn.Write(crawler.GetBlockHeaders{
+			_ = conn.Write(GetBlockHeaders{
 				RequestId: 69420, // Just a random number.
 				GetBlockHeadersRequest: &eth.GetBlockHeadersRequest{
 					Origin:  eth.HashOrNumber{Hash: msg.Head},
@@ -205,15 +192,15 @@ func (c *CrawlerV2) getClientInfo(
 				},
 			})
 
-		case *crawler.GetBlockBodies:
-			_ = conn.Write(crawler.BlockBodies{
+		case *GetBlockBodies:
+			_ = conn.Write(BlockBodies{
 				RequestId: msg.RequestId,
 			})
-		case *crawler.GetBlockHeaders:
-			_ = conn.Write(crawler.BlockHeaders{
+		case *GetBlockHeaders:
+			_ = conn.Write(BlockHeaders{
 				RequestId: msg.RequestId,
 			})
-		case *crawler.BlockHeaders:
+		case *BlockHeaders:
 			gotBlocks += 1
 
 			nodeJSON.BlockHeaders = append(
@@ -223,24 +210,24 @@ func (c *CrawlerV2) getClientInfo(
 
 			// Only exit once we have all the number of blocks we asked for.
 			if gotBlocks == getBlocks {
-				_ = conn.Write(crawler.Disconnect{Reason: p2p.DiscTooManyPeers})
+				_ = conn.Write(Disconnect{Reason: p2p.DiscTooManyPeers})
 
 				goto loopExit
 			}
-		case *crawler.Disconnect:
+		case *Disconnect:
 			disconnect = msg
 
 			goto loopExit
-		case *crawler.Error:
+		case *Error:
 			readError = msg
 
 			goto loopExit
 
 		// NOOP conditions
-		case *crawler.NewBlock:
-		case *crawler.NewBlockHashes:
-		case *crawler.NewPooledTransactionHashes:
-		case *crawler.Transactions:
+		case *NewBlock:
+		case *NewBlockHashes:
+		case *NewPooledTransactionHashes:
+		case *Transactions:
 
 		default:
 			log.Info("message type not handled", "type", reflect.TypeOf(msg).String())
@@ -272,7 +259,7 @@ loopExit:
 }
 
 func (c *CrawlerV2) crawlPeer(fd net.Conn) {
-	pubKey, conn, err := crawler.Accept(c.nodeKey, fd)
+	pubKey, conn, err := Accept(c.nodeKey, fd)
 	if err != nil {
 		known, _ := translateError(err)
 		if !known {
@@ -406,7 +393,7 @@ func translateError(err error) (bool, string) {
 }
 
 func (c *CrawlerV2) crawlNode(node *enode.Node) {
-	conn, err := crawler.Dial(c.nodeKey, node, 10*time.Second)
+	conn, err := Dial(c.nodeKey, node, 10*time.Second)
 	if err != nil {
 		known, errStr := translateError(err)
 		if !known {

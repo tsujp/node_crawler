@@ -47,13 +47,14 @@ type VCSInfo struct {
 func VCS() (VCSInfo, bool) {
 	if gitCommit != "" {
 		// Use information set by the build script if present.
-		return VCSInfo{Commit: gitCommit, Date: gitDate}, true
+		return VCSInfo{Commit: gitCommit, Date: gitDate, Dirty: false}, true
 	}
 	if buildInfo, ok := debug.ReadBuildInfo(); ok {
 		if buildInfo.Main.Path == ourPath {
 			return buildInfoVCS(buildInfo)
 		}
 	}
+	//nolint:exhaustruct
 	return VCSInfo{}, false
 }
 

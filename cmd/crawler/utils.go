@@ -1,12 +1,12 @@
 package main
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -16,8 +16,26 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func openSQLiteDB(name string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", name)
+func openSQLiteDB(cCtx *cli.Context, mode string) (*sql.DB, error) {
+	attachURI := buildConnURI(
+		cCtx,
+		statsDBFlag.Get(cCtx),
+		mode,
+		url.Values{
+			"_name": []string{"stats"},
+		},
+	)
+
+	uri := buildConnURI(
+		cCtx,
+		crawlerDBFlag.Get(cCtx),
+		mode,
+		url.Values{
+			"_attach": []string{attachURI},
+		},
+	)
+
+	db, err := sql.Open("sqlite_attach", uri)
 	if err != nil {
 		return nil, fmt.Errorf("opening database failed: %w", err)
 	}
@@ -25,8 +43,39 @@ func openSQLiteDB(name string) (*sql.DB, error) {
 	return db, nil
 }
 
+func buildConnURI(
+	cCtx *cli.Context,
+	filename string,
+	mode string,
+	query url.Values,
+) string {
+	//nolint:exhaustruct
+	uri := url.URL{
+		Path: filename,
+	}
+
+	busyTimeout := busyTimeoutFlag.Get(cCtx)
+	autovacuum := autovacuumFlag.Get(cCtx)
+
+	if busyTimeout != 0 {
+		query.Add("_pragma", fmt.Sprintf("busy_timeout=%d", busyTimeout))
+	}
+	if autovacuum != "" {
+		query.Add("_pragma", fmt.Sprintf("auto_vacuum=%s", autovacuum))
+	}
+
+	query.Add("_pragma", "journal_mode=wal")
+	query.Add("_pragma", "synchronous=normal")
+
+	query.Set("mode", mode)
+
+	uri.RawQuery = query.Encode()
+
+	return uri.String()
+}
+
 func openDBWriter(cCtx *cli.Context, geoipDB *geoip2.Reader) (*database.DB, error) {
-	sqlite, err := openSQLiteDB(crawlerDBFlag.Get(cCtx))
+	sqlite, err := openSQLiteDB(cCtx, "rwc")
 	if err != nil {
 		return nil, fmt.Errorf("opening database failed: %w", err)
 	}
@@ -39,42 +88,9 @@ func openDBWriter(cCtx *cli.Context, geoipDB *geoip2.Reader) (*database.DB, erro
 		nextCrawlNotEthFlag.Get(cCtx),
 	)
 
-	conn, err := sqlite.Conn(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("acquire conn failed: %w", err)
-	}
-
-	err = db.SetPragmas(
-		conn,
-		"main",
-		busyTimeoutFlag.Get(cCtx),
-		autovacuumFlag.Get(cCtx),
-		"wal",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("setting main pragmas failed: %w", err)
-	}
-
-	err = db.Migrate()
+	err = db.MigrateCrawler()
 	if err != nil {
 		return nil, fmt.Errorf("database migration failed: %w", err)
-	}
-
-	// Setup stats DB
-	err = db.AttachStatsDB(statsDBFlag.Get(cCtx))
-	if err != nil {
-		return nil, fmt.Errorf("attach stats failed: %w", err)
-	}
-
-	err = db.SetPragmas(
-		db.StatsConn(),
-		"stats",
-		busyTimeoutFlag.Get(cCtx),
-		autovacuumFlag.Get(cCtx),
-		"wal",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("setting status pragmas failed: %w", err)
 	}
 
 	err = db.MigrateStats()
@@ -86,45 +102,12 @@ func openDBWriter(cCtx *cli.Context, geoipDB *geoip2.Reader) (*database.DB, erro
 }
 
 func openDBReader(cCtx *cli.Context) (*database.DB, error) {
-	sqlite, err := openSQLiteDB(crawlerDBFlag.Get(cCtx))
+	sqlite, err := openSQLiteDB(cCtx, "ro")
 	if err != nil {
 		return nil, fmt.Errorf("opening database failed: %w", err)
 	}
 
 	db := database.NewAPIDB(sqlite)
-
-	conn, err := sqlite.Conn(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("acquire conn failed: %w", err)
-	}
-
-	err = db.SetPragmas(
-		conn,
-		"main",
-		busyTimeoutFlag.Get(cCtx),
-		"",
-		"",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("settings main pragmas failed: %w", err)
-	}
-
-	// Setup stats DB
-	err = db.AttachStatsDB(statsDBFlag.Get(cCtx))
-	if err != nil {
-		return nil, fmt.Errorf("attach stats failed: %w", err)
-	}
-
-	err = db.SetPragmas(
-		db.StatsConn(),
-		"stats",
-		busyTimeoutFlag.Get(cCtx),
-		"",
-		"",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("setting status pragmas failed: %w", err)
-	}
 
 	return db, nil
 }

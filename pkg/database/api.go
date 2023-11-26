@@ -447,7 +447,7 @@ func (db *DB) GetStats(ctx context.Context, after time.Time, before time.Time) (
 	start := time.Now()
 	defer metrics.ObserveDBQuery("get_stats", start, err)
 
-	rows, err := db.statsConn.QueryContext(
+	rows, err := db.db.QueryContext(
 		ctx,
 		`
 			SELECT

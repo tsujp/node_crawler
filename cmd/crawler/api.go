@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"path"
 	"sync"
 
 	_ "modernc.org/sqlite"
@@ -14,26 +13,25 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-var (
-	apiCommand = &cli.Command{
-		Name:   "api",
-		Usage:  "API server for the crawler",
-		Action: startAPI,
-		Flags: []cli.Flag{
-			&apiListenAddrFlag,
-			&busyTimeoutFlag,
-			&crawlerDBFlag,
-			&dropNodesTimeFlag,
-			&enodeFlag,
-			&metricsAddressFlag,
-			&snapshotFilenameFlag,
-			&statsDBFlag,
-			&statsUpdateFrequencyFlag,
-		},
-	}
-)
+//nolint:exhaustruct
+var apiCommand = &cli.Command{
+	Name:   "api",
+	Usage:  "API server for the crawler",
+	Action: runAPI,
+	Flags: []cli.Flag{
+		&apiListenAddrFlag,
+		&busyTimeoutFlag,
+		&crawlerDBFlag,
+		&dropNodesTimeFlag,
+		&enodeFlag,
+		&metricsAddressFlag,
+		&snapshotDirFlag,
+		&statsDBFlag,
+		&statsUpdateFrequencyFlag,
+	},
+}
 
-func startAPI(cCtx *cli.Context) error {
+func runAPI(cCtx *cli.Context) error {
 	db, err := openDBReader(cCtx)
 	if err != nil {
 		return fmt.Errorf("open db failed: %w", err)
@@ -48,7 +46,7 @@ func startAPI(cCtx *cli.Context) error {
 		db,
 		statsUpdateFrequencyFlag.Get(cCtx),
 		enodeFlag.Get(cCtx),
-		path.Dir(snapshotFilenameFlag.Get(cCtx)),
+		snapshotDirFlag.Get(cCtx),
 	)
 	go api.StartServer(
 		wg,

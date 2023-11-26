@@ -6,18 +6,17 @@ import (
 )
 
 func (db *DB) MigrateStats() error {
-	return migrate(
-		db.statsConn,
+	return db.migrate(
 		"stats",
 		[]migrationFn{
-			statsMigration000Schema,
-			statsMigration001AddUserData,
+			migrateStats000Schema,
+			migrateStats001AddUserData,
 		},
-		statsMigrateIndexes,
+		migrateStatsIndexes,
 	)
 }
 
-func statsMigrateIndexes(tx *sql.Tx) error {
+func migrateStatsIndexes(tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		CREATE INDEX IF NOT EXISTS stats.crawled_nodes_timestamp
 			ON crawled_nodes (timestamp);
@@ -29,7 +28,7 @@ func statsMigrateIndexes(tx *sql.Tx) error {
 	return nil
 }
 
-func statsMigration000Schema(tx *sql.Tx) error {
+func migrateStats000Schema(tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		CREATE TABLE IF NOT EXISTS stats.crawled_nodes (
 			timestamp		INTEGER	NOT NULL,
@@ -53,7 +52,7 @@ func statsMigration000Schema(tx *sql.Tx) error {
 	return nil
 }
 
-func statsMigration001AddUserData(tx *sql.Tx) error {
+func migrateStats001AddUserData(tx *sql.Tx) error {
 	_, err := tx.Exec(`
 		ALTER TABLE stats.crawled_nodes RENAME TO crawled_nodes_old;
 

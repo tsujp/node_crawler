@@ -16,9 +16,8 @@ import (
 )
 
 type DB struct {
-	db        *sql.DB
-	statsConn *sql.Conn
-	geoipDB   *geoip2.Reader
+	db      *sql.DB
+	geoipDB *geoip2.Reader
 
 	nextCrawlSucces int64
 	nextCrawlFail   int64
@@ -39,9 +38,8 @@ func NewDB(
 	nextCrawlNotEth time.Duration,
 ) *DB {
 	return &DB{
-		db:        db,
-		statsConn: nil,
-		geoipDB:   geoipDB,
+		db:      db,
+		geoipDB: geoipDB,
 
 		nextCrawlSucces: int64(nextCrawlSucces.Seconds()),
 		nextCrawlFail:   int64(nextCrawlFail.Seconds()),
@@ -55,33 +53,13 @@ func (db *DB) Close() error {
 	return db.db.Close()
 }
 
-func (db *DB) StatsConn() *sql.Conn {
-	return db.statsConn
-}
-
-func (db *DB) AnalyzeDaemon(frequency time.Duration) {
-	for {
-		start := time.Now()
-		nextAnalyze := start.Add(frequency)
-
-		db.wLock.Lock()
-		_, err := db.db.Exec("ANALYZE")
-		if err != nil {
-			log.Error("ANALYZE failed", "err", err)
-		}
-		db.wLock.Unlock()
-		metrics.ObserveDBQuery("analyze", start, err)
-
-		time.Sleep(time.Until(nextAnalyze))
-	}
-}
-
 type tableStats struct {
-	totalDiscoveredNodes int64
-	totalCrawledNodes    int64
-	totalBlocks          int64
-	totalToCrawl         int64
-	databaseSizeBytes    int64
+	totalDiscoveredNodes   int64
+	totalCrawledNodes      int64
+	totalBlocks            int64
+	totalToCrawl           int64
+	databaseSizeBytes      int64
+	databaseStatsSizeBytes int64
 }
 
 func (db *DB) getTableStats() (*tableStats, error) {
@@ -99,6 +77,10 @@ func (db *DB) getTableStats() (*tableStats, error) {
 			(
 				SELECT page_count * page_size
 				FROM pragma_page_count(), pragma_page_size()
+			),
+			(
+				SELECT page_count * page_size
+				FROM stats.pragma_page_count(), stats.pragma_page_size()
 			)
 	`)
 	if err != nil {
@@ -116,6 +98,7 @@ func (db *DB) getTableStats() (*tableStats, error) {
 			&stats.totalCrawledNodes,
 			&stats.totalBlocks,
 			&stats.databaseSizeBytes,
+			&stats.databaseStatsSizeBytes,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan failed: %w", err)
@@ -141,11 +124,12 @@ func (db *DB) TableStatsMetricsDaemon(frequency time.Duration) {
 			continue
 		}
 
-		metrics.DatabaseStats.WithLabelValues("crawled_nodes").Set(float64(stats.totalCrawledNodes))
-		metrics.DatabaseStats.WithLabelValues("discovered_nodes").Set(float64(stats.totalDiscoveredNodes))
-		metrics.DatabaseStats.WithLabelValues("to_crawl").Set(float64(stats.totalToCrawl))
-		metrics.DatabaseStats.WithLabelValues("blocks").Set(float64(stats.totalBlocks))
-		metrics.DatabaseStats.WithLabelValues("database_bytes").Set(float64(stats.databaseSizeBytes))
+		metrics.DBStatsBlocks.Set(float64(stats.totalBlocks))
+		metrics.DBStatsCrawledNodes.Set(float64(stats.totalCrawledNodes))
+		metrics.DBStatsDiscNodes.Set(float64(stats.totalDiscoveredNodes))
+		metrics.DBStatsNodesToCrawl.Set(float64(stats.totalToCrawl))
+		metrics.DBStatsSizeBytes.WithLabelValues("crawler").Set(float64(stats.databaseSizeBytes))
+		metrics.DBStatsSizeBytes.WithLabelValues("stats").Set(float64(stats.databaseStatsSizeBytes))
 
 		time.Sleep(time.Until(next))
 	}

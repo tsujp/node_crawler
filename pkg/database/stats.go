@@ -1,7 +1,6 @@
 package database
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 	"strings"
@@ -11,25 +10,6 @@ import (
 	"github.com/ethereum/node-crawler/pkg/metrics"
 	"golang.org/x/exp/slices"
 )
-
-func (db *DB) AttachStatsDB(filename string) error {
-	statsConn, err := db.db.Conn(context.Background())
-	if err != nil {
-		return fmt.Errorf("getting connection failed: %w", err)
-	}
-
-	_, err = statsConn.ExecContext(
-		context.Background(),
-		fmt.Sprintf(`ATTACH DATABASE '%s' AS stats`, filename),
-	)
-	if err != nil {
-		return fmt.Errorf("exec failed: %w", err)
-	}
-
-	db.statsConn = statsConn
-
-	return nil
-}
 
 // Meant to be run as a goroutine.
 //
@@ -52,8 +32,7 @@ func (db *DB) CopyStats() error {
 	start := time.Now()
 	defer metrics.ObserveDBQuery("copy_stats", start, err)
 
-	_, err = db.statsConn.ExecContext(
-		context.Background(),
+	_, err = db.db.Exec(
 		`
 			INSERT INTO stats.crawled_nodes
 		

@@ -25,27 +25,18 @@ import (
 	_ "modernc.org/sqlite/lib"
 )
 
-var (
-	//nolint:exhaustruct
-	app = &cli.App{
-		Name:        filepath.Base(os.Args[0]),
-		Usage:       "go-ethereum crawler",
-		Version:     "v.0.0.1",
-		Writer:      os.Stdout,
-		HideVersion: true,
-	}
-)
-
-func init() {
-	app.Flags = append(app.Flags, Flags...)
-	app.Before = func(ctx *cli.Context) error {
-		return Setup(ctx)
-	}
-	app.Commands = []*cli.Command{
+//nolint:exhaustruct
+var app = &cli.App{
+	Name:        filepath.Base(os.Args[0]),
+	Version:     "v0.0.1",
+	HideVersion: true,
+	Flags:       Flags,
+	Before:      Setup,
+	Commands: []*cli.Command{
 		apiCommand,
 		crawlerCommand,
 		printEnodeCommand,
-	}
+	},
 }
 
 func main() {
