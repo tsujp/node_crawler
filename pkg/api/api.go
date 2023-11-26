@@ -356,6 +356,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	clientNames := allStats.CountClientName()
 	countries := allStats.GroupCountries()
 	OSs := allStats.GroupOS()
+	dialSuccess := allStats.GroupDialSuccess()
 
 	statsPage := public.Stats(
 		reqURL,
@@ -363,6 +364,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		synced,
 		[]templ.Component{
 			public.StatsGraph("Client Names", "client_names", clientNames.Timeseries()),
+			public.StatsGraph("Dial Success", "dial_success", dialSuccess.Timeseries().Percentage()),
 		},
 		[]templ.Component{
 			public.StatsGroup("Client Names", clientNames.Last()),

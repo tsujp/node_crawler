@@ -653,7 +653,9 @@ templ Stats(reqURL URL, networkID int64, synced int, charts []templ.Component, s
 }
 
 script statsGraph(title string, id string, ts database.Timeseries) {
-	let chart = echarts.init(document.getElementById(id), 'dark');
+	const chartDiv = document.getElementById(id)
+	const chart = echarts.init(chartDiv, 'dark');
+
 	chart.setOption({
 		animation: false,
 		backgroundColor: '#111',
@@ -687,12 +689,14 @@ script statsGraph(title string, id string, ts database.Timeseries) {
 	  yAxis: [
 	    {
 	      type: 'value',
+				max: ts.yAxisMax,
 	    },
 	  ],
 	  series: ts.series,
 	});
 
-	window.addEventListener('resize', chart.resize);
+	const ro = new ResizeObserver(() => chart.resize());
+	ro.observe(chartDiv);
 }
 
 templ StatsGraph(title string, id string, ts database.Timeseries) {
@@ -733,12 +737,14 @@ templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 					color: #eee;
 				}
 				.chart {
+					display: flex;
+					flex-grow: 1;
 					padding: 1em;
 					border: 1px solid orange;
 					border-radius: 1em;
-			    width: 100%;
-			    height: 400px;
-			  }
+					width: 35%;
+					height: 400px;
+				}
 				a:link {
 					color: #eee;
 				}

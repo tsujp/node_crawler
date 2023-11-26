@@ -261,14 +261,43 @@ type ChartSeries struct {
 }
 
 type Timeseries struct {
-	Legend []string      `json:"legend"`
-	Series []ChartSeries `json:"series"`
-	XAxis  []ChartXAxis  `json:"xAxis"`
+	Legend   []string      `json:"legend"`
+	Series   []ChartSeries `json:"series"`
+	XAxis    []ChartXAxis  `json:"xAxis"`
+	YAxisMax *float64      `json:"yAxisMax"`
 }
 
 func newFloat(i int64) *float64 {
 	f := float64(i)
 	return &f
+}
+
+func (ts Timeseries) Percentage() Timeseries {
+	if len(ts.Series) < 2 {
+		return ts
+	}
+
+	for i := 0; i < len(ts.Series[0].Data); i++ {
+		var total float64 = 0.0
+
+		for _, series := range ts.Series {
+			value := series.Data[i]
+
+			if value != nil {
+				total += *value
+			}
+		}
+
+		for _, series := range ts.Series {
+			if series.Data[i] != nil {
+				*series.Data[i] = *series.Data[i] / total * 100
+			}
+		}
+	}
+
+	ts.YAxisMax = newFloat(100)
+
+	return ts
 }
 
 func (s AllCountTotal) Timeseries() Timeseries {
@@ -363,6 +392,7 @@ func (s AllCountTotal) Timeseries() Timeseries {
 				Data:       tsStr,
 			},
 		},
+		YAxisMax: nil,
 	}
 }
 
@@ -388,6 +418,18 @@ func (s AllStats) CountClientName(filters ...StatsFilterFn) AllCountTotal {
 	return s.GroupBy(
 		func(s Stats) string {
 			return s.Client.Name
+		},
+		filters...,
+	)
+}
+
+func (s AllStats) GroupDialSuccess(filters ...StatsFilterFn) AllCountTotal {
+	return s.GroupBy(
+		func(s Stats) string {
+			if s.DialSuccess {
+				return "Success"
+			}
+			return "Fail"
 		},
 		filters...,
 	)
