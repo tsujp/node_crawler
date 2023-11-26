@@ -58,12 +58,10 @@ func (db *DB) CopyStats() error {
 					WHERE
 						history.node_id = crawled.node_id
 						AND history.direction = 'dial'
+						AND history.crawled_at > unixepoch('now', '-7 days')
 						AND (
-							history.crawled_at > unixepoch('now', '-7 days')
-							AND (
-								history.error IS NULL
-								OR history.error IN ('too many peers')
-							)
+							history.error IS NULL
+							OR history.error IN ('too many peers')
 						)
 				) dial_success,
 				COUNT(*) total
@@ -87,7 +85,8 @@ func (db *DB) CopyStats() error {
 				crawled.fork_id,
 				crawled.next_fork_id,
 				crawled.country,
-				synced
+				synced,
+				dial_success
 		`,
 	)
 	if err != nil {
