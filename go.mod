@@ -94,4 +94,5 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
+// Waiting for https://gitlab.com/cznic/sqlite/-/merge_requests/63 to get merged
 replace modernc.org/sqlite => gitlab.com/angaz/sqlite v1.27.1-0.20231126190508-18f1221cb36c
