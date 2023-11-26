@@ -1,8 +1,7 @@
-package crawlerv2
+package crawler
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -16,10 +15,7 @@ import (
 )
 
 var (
-	_status          *Status
-	lastStatusUpdate time.Time
-	ErrNotEthNode    = errors.New("not an eth node")
-	clientName       = version.ClientName("NodeCrawler")
+	clientName = version.ClientName("NodeCrawler")
 )
 
 func Accept(pk *ecdsa.PrivateKey, fd net.Conn) (*ecdsa.PublicKey, *Conn, error) {

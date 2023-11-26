@@ -35,7 +35,7 @@ func openSQLiteDB(cCtx *cli.Context, mode string) (*sql.DB, error) {
 		},
 	)
 
-	db, err := sql.Open("sqlite_attach", uri)
+	db, err := sql.Open("sqlite", uri)
 	if err != nil {
 		return nil, fmt.Errorf("opening database failed: %w", err)
 	}

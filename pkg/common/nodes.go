@@ -37,9 +37,11 @@ const jsonIndent = "    "
 // as a JSON object.
 type NodeSet map[enode.ID]NodeJSON
 
+type Direction string
+
 const (
-	DirectionAccept = "accept"
-	DirectionDial   = "dial"
+	DirectionAccept Direction = "accept"
+	DirectionDial   Direction = "dial"
 )
 
 type NodeJSON struct {
@@ -59,7 +61,7 @@ type NodeJSON struct {
 
 	Error        string
 	EthNode      bool
-	Direction    string
+	Direction    Direction
 	BlockHeaders []*types.Header
 }
 

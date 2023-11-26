@@ -1,4 +1,4 @@
-package crawlerv2
+package crawler
 
 import (
 	"crypto/ecdsa"
@@ -74,14 +74,13 @@ func (c *CrawlerV2) nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.
 	var ip net.IP
 	var port int
 
-	if tcp, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+	tcp, ok := conn.RemoteAddr().(*net.TCPAddr)
+	if ok {
 		ip = tcp.IP
 		port = tcp.Port
 	}
 
 	node := enode.NewV4(pubkey, ip, port, port)
-	// node = c.discV4.Resolve(node)
-	// node = c.discV5.Resolve(node)
 
 	return node
 }
@@ -89,7 +88,7 @@ func (c *CrawlerV2) nodeFromConn(pubkey *ecdsa.PublicKey, conn net.Conn) *enode.
 func (c *CrawlerV2) getClientInfo(
 	conn *Conn,
 	node *enode.Node,
-	direction string,
+	direction common.Direction,
 ) {
 	err := writeHello(conn, c.nodeKey)
 	if err != nil {
@@ -98,6 +97,7 @@ func (c *CrawlerV2) getClientInfo(
 			log.Info("write hello failed", "err", err)
 		}
 
+		//nolint:exhaustruct  // Missing values because of error.
 		c.ch <- common.NodeJSON{
 			N:         node,
 			EthNode:   true,
@@ -111,6 +111,7 @@ func (c *CrawlerV2) getClientInfo(
 	var disconnect *Disconnect = nil
 	var readError *Error = nil
 
+	//nolint:exhaustruct  // Empty struct will be filled in.
 	nodeJSON := common.NodeJSON{
 		N:         node,
 		EthNode:   true,
@@ -174,6 +175,7 @@ func (c *CrawlerV2) getClientInfo(
 				_ = conn.Write(GetBlockHeaders{
 					RequestId: 69419,
 					GetBlockHeadersRequest: &eth.GetBlockHeadersRequest{
+						//nolint:exhaustruct  // Only one field is needed.
 						Origin:  eth.HashOrNumber{Hash: *getBlock},
 						Amount:  1,
 						Skip:    0,
@@ -185,6 +187,7 @@ func (c *CrawlerV2) getClientInfo(
 			_ = conn.Write(GetBlockHeaders{
 				RequestId: 69420, // Just a random number.
 				GetBlockHeadersRequest: &eth.GetBlockHeadersRequest{
+					//nolint:exhaustruct  // Only one field is needed.
 					Origin:  eth.HashOrNumber{Hash: msg.Head},
 					Amount:  1,
 					Skip:    0,
@@ -194,11 +197,13 @@ func (c *CrawlerV2) getClientInfo(
 
 		case *GetBlockBodies:
 			_ = conn.Write(BlockBodies{
-				RequestId: msg.RequestId,
+				RequestId:           msg.RequestId,
+				BlockBodiesResponse: nil,
 			})
 		case *GetBlockHeaders:
 			_ = conn.Write(BlockHeaders{
-				RequestId: msg.RequestId,
+				RequestId:           msg.RequestId,
+				BlockHeadersRequest: nil,
 			})
 		case *BlockHeaders:
 			gotBlocks += 1
@@ -361,7 +366,7 @@ func (c *CrawlerV2) updaterLoop() {
 			log.Error("upsert crawled node failed", "err", err, "node_id", node.TerminalString())
 		}
 
-		metrics.NodeUpdateInc(node.Direction, node.Error)
+		metrics.NodeUpdateInc(string(node.Direction), node.Error)
 	}
 }
 
@@ -400,6 +405,7 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 			log.Info("dial failed", "err", err)
 		}
 
+		//nolint:exhaustruct  // Missing values because of error.
 		c.ch <- common.NodeJSON{
 			N:         node,
 			EthNode:   true,
@@ -411,7 +417,11 @@ func (c *CrawlerV2) crawlNode(node *enode.Node) {
 	}
 	defer conn.Close()
 
-	c.getClientInfo(conn, node, common.DirectionDial)
+	c.getClientInfo(
+		conn,
+		node,
+		common.DirectionDial,
+	)
 }
 
 // Meant to be run as a goroutine

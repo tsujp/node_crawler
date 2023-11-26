@@ -27,8 +27,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/node-crawler/pkg/crawlerv2"
 	"github.com/ethereum/node-crawler/pkg/disc"
+	"github.com/ethereum/node-crawler/pkg/execution/crawler"
 
 	"github.com/urfave/cli/v2"
 )
@@ -126,7 +126,7 @@ func crawlNodesV2(cCtx *cli.Context) error {
 		return fmt.Errorf("start disc daemon failed: %w", err)
 	}
 
-	crawler, err := crawlerv2.NewCrawler(
+	crawler, err := crawler.NewCrawler(
 		db,
 		disc.DiscV4(),
 		disc.DiscV5(),

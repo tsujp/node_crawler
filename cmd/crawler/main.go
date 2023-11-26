@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	"github.com/urfave/cli/v2"
-	_ "modernc.org/sqlite/lib"
 )
 
 //nolint:exhaustruct

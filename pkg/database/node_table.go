@@ -8,11 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/node-crawler/pkg/common"
 )
 
 type NodeTableHistory struct {
 	CrawledAt time.Time
-	Direction string
+	Direction common.Direction
 	Error     string
 }
 
