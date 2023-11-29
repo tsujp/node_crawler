@@ -416,7 +416,7 @@ func (db *DB) GetMissingBlock(networkID uint64) (*ethcommon.Hash, error) {
 	start := time.Now()
 	defer metrics.ObserveDBQuery("get_missing_block", start, err)
 
-	rows, err := db.db.Query(
+	rows, err := db.QueryRetryBusy(
 		`
 			SELECT
 				crawled.head_hash
