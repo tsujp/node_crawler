@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -28,7 +29,7 @@ func (db *DB) snapshot(database string, snapshotFilename string) {
 
 	snapshotStart := time.Now()
 
-	_, err := db.db.Exec(fmt.Sprintf("VACUUM %s INTO '%s'", database, snapshotName))
+	_, err := db.ExecRetryBusy(fmt.Sprintf("VACUUM %s INTO '%s'", database, snapshotName))
 	if err != nil {
 		log.Error(
 			"Snapshot failed",
@@ -206,11 +207,13 @@ func (db *DB) SnapshotDaemon(database string, snapshotDir string, snapshotFilena
 		return
 	}
 
+	fullName := path.Join(snapshotDir, snapshotFilename)
+
 	for {
 		// Start of tomorrow
 		nextSnapshot := today().AddDate(0, 0, 1)
 		time.Sleep(time.Until(nextSnapshot))
 
-		db.snapshot(database, snapshotFilename)
+		db.snapshot(database, fullName)
 	}
 }
