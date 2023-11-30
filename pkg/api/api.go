@@ -74,7 +74,7 @@ func (a *API) statsUpdaterDaemon() {
 		log.Debug("updating stats...")
 
 		// deleteBeforeTs := start.AddDate(0, 0, -7)
-		deleteBeforeTs := start.AddDate(0, 0, -1)
+		deleteBeforeTs := start.AddDate(0, 0, -14)
 		afterTs := deleteBeforeTs
 
 		oldStats := a.getStats()
@@ -362,7 +362,9 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		reqURL,
 		networkID,
 		synced,
-		[]templ.Component{},
+		[]templ.Component{
+			public.StatsGraph("Client Names", "client_names", clientNames.Timeseries()),
+		},
 		[]templ.Component{
 			public.StatsGroup("Client Names", clientNames.Last()),
 			public.StatsGroup("Countries", countries.Last().Limit(20)),
