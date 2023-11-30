@@ -178,7 +178,6 @@ func (s AllStats) GroupBy(keyFn KeyFn, filters ...StatsFilterFn) AllCountTotal {
 		allCount[ts][key] = v
 	}
 
-	// 7 days * 24 hours * 2 stats per hour
 	allOut := make([]CountTotal, 0, len(allCount))
 
 	for ts, count := range allCount {

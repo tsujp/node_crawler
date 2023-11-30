@@ -73,7 +73,8 @@ func (a *API) statsUpdaterDaemon() {
 
 		log.Debug("updating stats...")
 
-		deleteBeforeTs := start.AddDate(0, 0, -7)
+		// deleteBeforeTs := start.AddDate(0, 0, -7)
+		deleteBeforeTs := start.AddDate(0, 0, -1)
 		afterTs := deleteBeforeTs
 
 		oldStats := a.getStats()
@@ -356,16 +357,12 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	clientNames := allStats.CountClientName()
 	countries := allStats.GroupCountries()
 	OSs := allStats.GroupOS()
-	dialSuccess := allStats.GroupDialSuccess()
 
 	statsPage := public.Stats(
 		reqURL,
 		networkID,
 		synced,
-		[]templ.Component{
-			public.StatsGraph("Client Names", "client_names", clientNames.Timeseries()),
-			public.StatsGraph("Dial Success", "dial_success", dialSuccess.Timeseries().Percentage()),
-		},
+		[]templ.Component{},
 		[]templ.Component{
 			public.StatsGroup("Client Names", clientNames.Last()),
 			public.StatsGroup("Countries", countries.Last().Limit(20)),
