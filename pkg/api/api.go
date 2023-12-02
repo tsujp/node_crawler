@@ -74,7 +74,7 @@ func (a *API) statsUpdaterDaemon() {
 		log.Debug("updating stats...")
 
 		// deleteBeforeTs := start.AddDate(0, 0, -7)
-		deleteBeforeTs := start.AddDate(0, 0, -14)
+		deleteBeforeTs := start.AddDate(0, 0, -1)
 		afterTs := deleteBeforeTs
 
 		oldStats := a.getStats()

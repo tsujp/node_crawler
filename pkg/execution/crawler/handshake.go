@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/rlpx"
-	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/version"
 )
 
@@ -79,27 +78,4 @@ func writeHello(conn *Conn, priv *ecdsa.PrivateKey) error {
 	conn.ourHighestSnapProtoVersion = 1
 
 	return conn.Write(h)
-}
-
-func readHello(conn *Conn, info *common.ClientInfo) error {
-	switch msg := conn.Read().(type) {
-	case *Hello:
-		// set snappy if version is at least 5
-		if msg.Version >= 5 {
-			conn.SetSnappy(true)
-		}
-		info.Capabilities = msg.Caps
-		info.RLPxVersion = msg.Version
-		info.ClientName = msg.Name
-
-		conn.NegotiateEthProtocol(info.Capabilities)
-
-		return nil
-	case *Disconnect:
-		return fmt.Errorf("bad hello handshake disconnect: %v", msg.Reason.Error())
-	case *Error:
-		return fmt.Errorf("bad hello handshake error: %v", msg.Error())
-	default:
-		return fmt.Errorf("bad hello handshake code: %v", msg.Code())
-	}
 }
