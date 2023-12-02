@@ -65,6 +65,7 @@ func writeHello(conn *Conn, priv *ecdsa.PrivateKey) error {
 		Name:    clientName,
 		Version: 5,
 		Caps: []p2p.Cap{
+			{Name: "eth", Version: 66},
 			{Name: "eth", Version: 67},
 			{Name: "eth", Version: 68},
 			{Name: "snap", Version: 1},
