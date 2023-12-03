@@ -1,6 +1,6 @@
 module github.com/ethereum/node-crawler
 
-go 1.21
+go 1.21.4
 
 require (
 	github.com/a-h/templ v0.2.476
@@ -13,13 +13,14 @@ require (
 	github.com/urfave/cli/v2 v2.25.7
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
 	golang.org/x/text v0.14.0
-	modernc.org/sqlite v1.27.1
+	modernc.org/sqlite v1.27.1-0.20231202161847-cf98001416f1
 )
 
 require (
 	github.com/DataDog/zstd v1.5.5 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
+	github.com/angaz/sqlu v0.0.0-20231203221236-785e75be14ca // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.11.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
@@ -93,6 +94,3 @@ require (
 	modernc.org/token v1.1.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
-
-// Waiting for https://gitlab.com/cznic/sqlite/-/merge_requests/63 to get merged
-replace modernc.org/sqlite => gitlab.com/angaz/sqlite v1.27.1-0.20231126190508-18f1221cb36c
