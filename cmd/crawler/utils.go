@@ -6,78 +6,52 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 
+	"github.com/angaz/sqlu"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/oschwald/geoip2-golang"
 	"github.com/urfave/cli/v2"
 )
 
-func openSQLiteDB(cCtx *cli.Context, mode string) (*sql.DB, error) {
-	attachURI := buildConnURI(
-		cCtx,
-		statsDBFlag.Get(cCtx),
-		mode,
-		url.Values{
-			"_name": []string{"stats"},
+func openSQLiteDB(cCtx *cli.Context, mode sqlu.Param) (*sql.DB, error) {
+	dsn := sqlu.ConnParams{
+		Filename: crawlerDBFlag.Get(cCtx),
+		Mode:     mode,
+		Pragma: []sqlu.Pragma{
+			sqlu.PragmaBusyTimeout(int64(busyTimeoutFlag.Get(cCtx))),
+			sqlu.PragmaJournalSizeLimit(128 * 1024 * 1024), // 128MiB
+			sqlu.PragmaAutoVacuumIncremental,
+			sqlu.PragmaJournalModeWAL,
 		},
-	)
-
-	uri := buildConnURI(
-		cCtx,
-		crawlerDBFlag.Get(cCtx),
-		mode,
-		url.Values{
-			"_attach": []string{attachURI},
+		Attach: []sqlu.AttachParams{
+			{
+				Filename: statsDBFlag.Get(cCtx),
+				Database: "stats",
+				Mode:     mode,
+				Pragma: []sqlu.Pragma{
+					sqlu.PragmaJournalSizeLimit(128 * 1024 * 1024), // 128MiB
+					sqlu.PragmaAutoVacuumIncremental,
+					sqlu.PragmaJournalModeWAL,
+				},
+			},
 		},
-	)
+	}
 
-	db, err := sql.Open("sqlite", uri)
+	db, err := sql.Open("sqlite", dsn.ConnectionString())
 	if err != nil {
-		return nil, fmt.Errorf("opening database failed: %w", err)
+		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
 	return db, nil
 }
 
-func buildConnURI(
-	cCtx *cli.Context,
-	filename string,
-	mode string,
-	query url.Values,
-) string {
-	//nolint:exhaustruct
-	uri := url.URL{
-		Path: filename,
-	}
-
-	busyTimeout := busyTimeoutFlag.Get(cCtx)
-	autovacuum := autovacuumFlag.Get(cCtx)
-
-	if busyTimeout != 0 {
-		query.Add("_pragma", fmt.Sprintf("busy_timeout=%d", busyTimeout))
-	}
-	if autovacuum != "" {
-		query.Add("_pragma", fmt.Sprintf("auto_vacuum=%s", autovacuum))
-	}
-
-	query.Add("_pragma", "journal_mode=wal")
-	query.Add("_pragma", "synchronous=normal")
-
-	query.Set("mode", mode)
-
-	uri.RawQuery = query.Encode()
-
-	return uri.String()
-}
-
 func openDBWriter(cCtx *cli.Context, geoipDB *geoip2.Reader) (*database.DB, error) {
-	sqlite, err := openSQLiteDB(cCtx, "rwc")
+	sqlite, err := openSQLiteDB(cCtx, sqlu.ParamModeRWC)
 	if err != nil {
-		return nil, fmt.Errorf("opening database failed: %w", err)
+		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
 	db := database.NewDB(
@@ -102,7 +76,7 @@ func openDBWriter(cCtx *cli.Context, geoipDB *geoip2.Reader) (*database.DB, erro
 }
 
 func openDBReader(cCtx *cli.Context) (*database.DB, error) {
-	sqlite, err := openSQLiteDB(cCtx, "ro")
+	sqlite, err := openSQLiteDB(cCtx, sqlu.ParamModeRO)
 	if err != nil {
 		return nil, fmt.Errorf("opening database failed: %w", err)
 	}
