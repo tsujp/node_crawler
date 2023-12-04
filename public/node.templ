@@ -814,8 +814,8 @@ templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 		<body>
 			<nav>
 				<ul>
-					<li class={ templ.KV("active", reqURL.Path == "/") }><a href={ reqURL.WithPath("/").SafeURL() }>Stats</a></li>
-					<li class={ templ.KV("active", reqURL.Path == "/nodes/") }><a href={ reqURL.WithPath("/nodes/").WithParam("page", "1").SafeURL() }>Nodes</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/") }><a href={ reqURL.WithPath("/").RemoveParam("after", "before").SafeURL() }>Stats</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/nodes/") }><a href={ reqURL.WithPath("/nodes/").RemoveParam("after", "before").WithParam("page", "1").SafeURL() }>Nodes</a></li>
 					<li class={ templ.KV("active", reqURL.Path == "/history/") }><a href={ reqURL.WithPath("/history/").RemoveParam("after", "before").SafeURL() }>Crawl History</a></li>
 					<li class={ templ.KV("active", reqURL.Path == "/help/") }><a href="/help/">Help</a></li>
 					<li class={ templ.KV("active", reqURL.Path == "/snapshots/") }><a href="/snapshots/">Snapshots</a></li>
