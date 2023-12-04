@@ -91,7 +91,7 @@ func (n *NodeJSON) ConnectionType() string {
 
 func (n *NodeJSON) GetInfo() ClientInfo {
 	if n.Info == nil {
-		return ClientInfo{}
+		return ClientInfo{} //nolint:exhaustruct
 	}
 
 	return *n.Info

@@ -231,8 +231,9 @@ type AllCountTotal []CountTotal
 func (s AllCountTotal) Last() CountTotal {
 	if len(s) == 0 {
 		return CountTotal{
-			Values: []Count{},
-			Total:  0,
+			Timestamp: time.Time{},
+			Values:    []Count{},
+			Total:     0,
 		}
 	}
 
@@ -396,8 +397,9 @@ func (s AllCountTotal) Timeseries() Timeseries {
 
 func (t CountTotal) Limit(limit int) CountTotal {
 	return CountTotal{
-		Values: t.Values[:min(limit, len(t.Values))],
-		Total:  t.Total,
+		Timestamp: time.Time{},
+		Values:    t.Values[:min(limit, len(t.Values))],
+		Total:     t.Total,
 	}
 }
 
@@ -407,8 +409,9 @@ func (t CountTotal) OrderBy(orderByFn CountTotalOrderFn) CountTotal {
 	slices.SortStableFunc(t.Values, orderByFn)
 
 	return CountTotal{
-		Values: t.Values,
-		Total:  t.Total,
+		Timestamp: time.Time{},
+		Values:    t.Values,
+		Total:     t.Total,
 	}
 }
 

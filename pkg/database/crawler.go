@@ -25,6 +25,7 @@ type location struct {
 
 func (db *DB) IPToLocation(ip net.IP) (location, error) {
 	if db.geoipDB == nil {
+		//nolint:exhaustruct
 		return location{}, nil
 	}
 

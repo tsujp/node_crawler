@@ -39,6 +39,13 @@ func New(
 		db:         db,
 		listenAddr: listenAddr,
 		privateKey: privateKey,
+
+		bootnodes: []*enode.Node{},
+		nodeDB:    &enode.DB{},
+		localnode: &enode.LocalNode{},
+		v4:        &discover.UDPv4{},
+		v5:        &discover.UDPv5{},
+		wg:        &sync.WaitGroup{},
 	}
 
 	var err error
@@ -57,10 +64,9 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("opening enode DB failed: %w", err)
 	}
+
 	d.nodeDB = nodeDB
 	d.localnode = enode.NewLocalNode(nodeDB, d.privateKey)
-
-	d.wg = new(sync.WaitGroup)
 
 	return d, nil
 }
@@ -87,6 +93,7 @@ func (d *Discovery) setupDiscovery() error {
 	unhandled := make(chan discover.ReadPacket, 128)
 	sharedConn := &sharedUDPConn{conn, unhandled}
 
+	//nolint:exhaustruct
 	d.v4, err = discover.ListenV4(conn, d.localnode, discover.Config{
 		PrivateKey: d.privateKey,
 		Bootnodes:  d.bootnodes,
@@ -96,6 +103,7 @@ func (d *Discovery) setupDiscovery() error {
 		return fmt.Errorf("setting up discv4 failed: %w", err)
 	}
 
+	//nolint:exhaustruct
 	d.v5, err = discover.ListenV5(sharedConn, d.localnode, discover.Config{
 		PrivateKey: d.privateKey,
 		Bootnodes:  d.bootnodes,

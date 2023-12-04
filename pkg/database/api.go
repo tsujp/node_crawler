@@ -172,7 +172,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 	defer rows.Close()
 
 	for rows.Next() {
-		history := NodeTableHistory{}
+		history := NodeTableHistory{} //nolint:exhaustruct
 		var crawledAtInt int64
 
 		err = rows.Scan(
@@ -402,7 +402,7 @@ func (db *DB) GetNodeList(
 			break
 		}
 
-		row := NodeListRow{}
+		row := NodeListRow{} //nolint:exhaustruct
 		var updatedAtInt, headHashTimeInt *int64
 		var userData *string
 
@@ -485,7 +485,7 @@ func (db *DB) GetStats(ctx context.Context, after time.Time, before time.Time) (
 	allStats := make([]Stats, 0, 1024)
 
 	for rows.Next() {
-		stats := Stats{}
+		stats := Stats{} //nolint:exhaustruct
 		var clientName, clientUserData, clientVersion, clientOS, clientArch *string
 		var timestamp int64
 
@@ -682,7 +682,7 @@ func (db *DB) GetHistoryList(
 	}
 
 	for rows.Next() {
-		row := HistoryListRow{}
+		row := HistoryListRow{} //nolint:exhaustruct
 		nodeIDBytes := make([]byte, 32)
 		var crawledAtInt int64
 
