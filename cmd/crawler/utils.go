@@ -25,6 +25,7 @@ func openSQLiteDB(cCtx *cli.Context, mode sqlu.Param) (*sql.DB, error) {
 			sqlu.PragmaJournalSizeLimit(128 * 1024 * 1024), // 128MiB
 			sqlu.PragmaAutoVacuumIncremental,
 			sqlu.PragmaJournalModeWAL,
+			sqlu.PragmaSynchronousNormal,
 		},
 		Attach: []sqlu.AttachParams{
 			{
@@ -35,6 +36,7 @@ func openSQLiteDB(cCtx *cli.Context, mode sqlu.Param) (*sql.DB, error) {
 					sqlu.PragmaJournalSizeLimit(128 * 1024 * 1024), // 128MiB
 					sqlu.PragmaAutoVacuumIncremental,
 					sqlu.PragmaJournalModeWAL,
+					sqlu.PragmaSynchronousNormal,
 				},
 			},
 		},

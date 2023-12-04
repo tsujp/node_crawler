@@ -37,12 +37,9 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 			)
 			ON CONFLICT (node_id) DO UPDATE
 			SET
-				node_record = excluded.node_record,
+				node_record = best_record(node_record, excluded.node_record),
 				ip_address = excluded.ip_address,
 				last_found = unixepoch()
-			WHERE
-				node_record != excluded.node_record
-				OR unixepoch() - last_found > 3600 -- Update at most once per hour
 		`,
 		node.ID().Bytes(),
 		common.EncodeENR(node.Record()),

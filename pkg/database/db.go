@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	_ "embed"
 	"fmt"
 	"math"
@@ -11,9 +12,15 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/node-crawler/pkg/common"
 	"github.com/ethereum/node-crawler/pkg/metrics"
 	"github.com/oschwald/geoip2-golang"
+	"modernc.org/sqlite"
 )
+
+func init() {
+	sqlite.RegisterDeterministicScalarFunction("best_record", 2, bestRecord)
+}
 
 type DB struct {
 	db      *sql.DB
@@ -169,4 +176,28 @@ func (db *DB) QueryRetryBusy(query string, args ...any) (*sql.Rows, error) {
 	return retryBusy(func() (*sql.Rows, error) {
 		return db.db.Query(query, args...)
 	})
+}
+
+func bestRecord(ctx *sqlite.FunctionContext, args []driver.Value) (driver.Value, error) {
+	a, ok := args[0].([]byte)
+	if !ok {
+		return nil, fmt.Errorf("first arg: not BLOB")
+	}
+
+	b, ok := args[1].([]byte)
+	if !ok {
+		return nil, fmt.Errorf("second arg: not BLOB")
+	}
+
+	recordA, err := common.LoadENR(a)
+	if err != nil {
+		return nil, fmt.Errorf("first arg: load enr: %w", err)
+	}
+
+	recordB, err := common.LoadENR(b)
+	if err != nil {
+		return nil, fmt.Errorf("second arg: load enr: %w", err)
+	}
+
+	return common.EncodeENR(common.BestRecord(recordA, recordB)), nil
 }

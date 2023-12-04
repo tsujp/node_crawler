@@ -68,6 +68,30 @@ func LoadENR(b []byte) (*enr.Record, error) {
 	return &record, nil
 }
 
+var IDv4 = string(enr.IDv4)
+
+// Finds the best Record.
+// The best record is the one with the highest sequence number.
+// If the sequence numbers are the same, then B is returned.
+//
+// Since enode records don't have a sequence number, ENRs will naturally be
+// preferred.
+func BestRecord(a, b *enr.Record) *enr.Record {
+	if a == nil {
+		return b
+	}
+
+	if b == nil {
+		return a
+	}
+
+	if a.Seq() > b.Seq() {
+		return a
+	}
+
+	return b
+}
+
 func ENRString(r *enr.Record) string {
 	// Always succeeds because record is valid.
 	enc, _ := rlp.EncodeToBytes(r)
@@ -93,7 +117,7 @@ func RecordIP(r *enr.Record) net.IP {
 	return nil
 }
 
-func RecordToV4(r *enr.Record) *enode.Node {
+func RecordToEnodeV4(r *enr.Record) *enode.Node {
 	ip := RecordIP(r)
 
 	var tcp enr.TCP
@@ -109,12 +133,11 @@ func RecordToV4(r *enr.Record) *enode.Node {
 	pkey := ecdsa.PublicKey(pubkey)
 
 	return enode.NewV4(&pkey, ip, int(tcp), int(udp))
-
 }
 
 func RecordToEnode(r *enr.Record) (*enode.Node, error) {
 	if r.IdentityScheme() == "" {
-		return RecordToV4(r), nil
+		return RecordToEnodeV4(r), nil
 	}
 
 	return enode.New(enode.ValidSchemes, r)

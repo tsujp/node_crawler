@@ -129,6 +129,7 @@ func (db *DB) UpdateNotEthNode(node common.NodeJSON) error {
 			)
 			ON CONFLICT (node_id) DO UPDATE
 			SET
+				last_found = unixepoch(),
 				next_crawl = excluded.next_crawl
 			WHERE ?5 == 'dial'
 		`,
@@ -266,8 +267,8 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 				last_found = unixepoch(),
 				-- Only update next_crawl if we initiated the connection.
 				-- Even if the peer initiated the the connection, we still
-				-- want to try dialing because we want to see if the node is
-				-- exposed.
+				-- want to try dialing because we want to see if the node has
+				-- good inbound network configuration.
 				next_crawl = CASE
 					WHEN ?23 == 'dial'
 						THEN excluded.next_crawl
