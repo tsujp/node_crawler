@@ -165,10 +165,15 @@ func (a *API) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(out))
 }
 
-func parseAllYesNoParam(w http.ResponseWriter, str string, param string) (int, bool) {
+func parseAllYesNoParam(
+	w http.ResponseWriter,
+	str string,
+	param string,
+	defaultValue int,
+) (int, bool) {
 	switch str {
 	case "":
-		return 1, true
+		return defaultValue, true
 	case "all":
 		return -1, true
 	case "yes":
@@ -177,7 +182,7 @@ func parseAllYesNoParam(w http.ResponseWriter, str string, param string) (int, b
 		return 0, true
 	}
 
-	synced, err := strconv.Atoi(str)
+	value, err := strconv.Atoi(str)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = fmt.Fprintf(w, "bad %s value: %s\n", param, str)
@@ -185,22 +190,22 @@ func parseAllYesNoParam(w http.ResponseWriter, str string, param string) (int, b
 		return 0, false
 	}
 
-	if synced != -1 && synced != 0 && synced != 1 {
+	if value != -1 && value != 0 && value != 1 {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = fmt.Fprintf(w, "bad %s value: %s. Must be one of all, yes, no\n", param, str)
 
 		return 0, false
 	}
 
-	return synced, true
+	return value, true
 }
 
 func parseSyncedParam(w http.ResponseWriter, str string) (int, bool) {
-	return parseAllYesNoParam(w, str, "synced")
+	return parseAllYesNoParam(w, str, "synced", 1)
 }
 
 func parseErrorParam(w http.ResponseWriter, str string) (int, bool) {
-	return parseAllYesNoParam(w, str, "error")
+	return parseAllYesNoParam(w, str, "error", -1)
 }
 
 func parsePageNum(w http.ResponseWriter, pageNumStr string) (int, bool) {
