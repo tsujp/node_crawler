@@ -15,8 +15,9 @@ type API struct {
 	enode                string
 	snapshotDir          string
 
-	stats     database.AllStats
-	statsLock sync.RWMutex
+	stats      database.AllStats
+	statsLock  sync.RWMutex
+	statsCache map[string][]byte
 }
 
 func New(
@@ -31,8 +32,9 @@ func New(
 		enode:                enode,
 		snapshotDir:          snapshotDir,
 
-		stats:     database.AllStats{},
-		statsLock: sync.RWMutex{},
+		stats:      database.AllStats{},
+		statsLock:  sync.RWMutex{},
+		statsCache: map[string][]byte{},
 	}
 
 	go api.statsUpdaterDaemon()
@@ -45,6 +47,7 @@ func (a *API) replaceStats(newStats database.AllStats) {
 	defer a.statsLock.Unlock()
 
 	a.stats = newStats
+	a.statsCache = map[string][]byte{}
 }
 
 func (a *API) getStats() database.AllStats {
@@ -52,6 +55,22 @@ func (a *API) getStats() database.AllStats {
 	defer a.statsLock.RUnlock()
 
 	return a.stats
+}
+
+func (a *API) getCache(params string) ([]byte, bool) {
+	a.statsLock.RLock()
+	defer a.statsLock.RUnlock()
+
+	b, ok := a.statsCache[params]
+
+	return b, ok
+}
+
+func (a *API) setCache(params string, b []byte) {
+	a.statsLock.Lock()
+	defer a.statsLock.Unlock()
+
+	a.statsCache[params] = b
 }
 
 func (a *API) StartServer(wg *sync.WaitGroup, address string) {

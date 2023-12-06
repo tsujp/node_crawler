@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -20,6 +21,15 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	synced, ok := parseSyncedParam(w, syncedStr)
 	if !ok {
+		return
+	}
+
+	params := fmt.Sprintf("%d,%d", networkID, synced)
+
+	b, ok := a.getCache(params)
+	if ok {
+		_, _ = w.Write(b)
+
 		return
 	}
 
@@ -83,4 +93,6 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	out := strings.ReplaceAll(sb.String(), "STYLE_REPLACE", "style")
 
 	_, _ = w.Write([]byte(out))
+
+	a.setCache(params, []byte(out))
 }
