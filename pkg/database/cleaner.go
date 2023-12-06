@@ -27,7 +27,7 @@ func (db *DB) clean() {
 	// defer cancel()
 
 	db.blocksCleaner(ctx)
-	db.historyCleaner(ctx)
+	// db.historyCleaner(ctx)
 }
 
 func (db *DB) blocksCleaner(ctx context.Context) {
