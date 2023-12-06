@@ -124,7 +124,7 @@ templ NodeTable(nt database.NodeTable) {
 			<image width="800px" src="/static/blue-marble.png"></image>
 			<image style="REPLACE_THIS_ETH_LOGO" height="10%" src="/static/eth-diamond-purple.png"></image>
 		</div>
-		<h3>Crawl Hitory</h3>
+		<h3>Crawl History</h3>
 		<div style="display: flex; flex-wrap: wrap; column-gap: 2em;">
 			<div style="display: flex; flex-direction: column; align-items: center; gap: 0.5em; border: 1px solid orange; border-radius: 1em; padding: 1em;">
 				<h4 style="margin: 0;">Accept</h4>
@@ -233,6 +233,9 @@ templ HelpPage(enode string) {
 		<div>
 			<ul>
 				<li>
+					<a href="#dial-accept">Dial / Accept</a>
+				</li>
+				<li>
 					<a href="#add-your-node">Add Your Node</a>
 					<ul>
 						<li>
@@ -259,6 +262,18 @@ templ HelpPage(enode string) {
 		<div style="display: flex; flex-direction: column; gap: 1em; padding: 1em; overflow-y: scroll">
 			<h2>Help</h2>
 			<div style="display: flex; flex-direction: column;">
+				<h3 id="dial-accept">Dial / Accept, what does it mean?</h3>
+				<p>
+					There's a few mentions of "Dial" and "Accept" on the website.
+					This is referring to the crawler dialing (connecting to) a node, or
+					accepting a connection from a node.
+				</p>
+
+				<p>
+					The "Dial Success" value used in a few places means that the crawler
+					was able to connect to the node in the last 14 days.
+				</p>
+
 				<h3 id="#add-your-node">Add your node</h3>
 				<p>If your node is not found, it can be easily added.</p>
 
@@ -295,7 +310,7 @@ templ HelpPage(enode string) {
 				</code>
 
 				<h4 id="add-your-node-geth">Geth</h4>
-				<p>Run the following command in the Javascript console:</p>
+				<p>Run the following command in the JavaScript console:</p>
 				<code>
 					admin.addPeer('{ enode }')
 				</code>
@@ -753,41 +768,41 @@ script statsGraph(title string, id string, ts database.Timeseries) {
 		animation: false,
 		backgroundColor: '#111',
 		title: {
-	    text: title,
-	  },
-	  tooltip: {
-	    trigger: 'axis',
-	    axisPointer: {
-	      type: 'cross',
-	      label: {
-	        backgroundColor: '#6a7985'
-	      },
-	    },
+			text: title,
+		},
+		tooltip: {
+		trigger: 'axis',
+			axisPointer: {
+				type: 'cross',
+				label: {
+					backgroundColor: '#6a7985'
+				},
+			},
 			valueFormatter: (value) =>  value.toFixed(2) + '%',
 			order: 'valueDesc',
-	  },
-	  legend: {
-	    data: ts.legend,
-	  },
-	  toolbox: {
-	    feature: {
-	      saveAsImage: {}
-	    },
-	  },
-	  grid: {
-	    left: '3%',
-	    right: '4%',
-	    bottom: '3%',
-	    containLabel: true,
-	  },
-	  xAxis: ts.xAxis,
-	  yAxis: [
-	    {
-	      type: 'value',
+		},
+		legend: {
+			data: ts.legend,
+		},
+		toolbox: {
+			feature: {
+				saveAsImage: {},
+			},
+		},
+		grid: {
+			left: '3%',
+			right: '4%',
+			bottom: '3%',
+			containLabel: true,
+		},
+		xAxis: ts.xAxis,
+		yAxis: [
+			{
+				type: 'value',
 				max: ts.yAxisMax,
-	    },
-	  ],
-	  series: ts.series,
+			},
+		],
+		series: ts.series,
 	});
 
 	const ro = new ResizeObserver(() => chart.resize());

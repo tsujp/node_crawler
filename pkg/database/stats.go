@@ -138,7 +138,8 @@ func (s AllStats) LastStats() AllStats {
 }
 
 func (s AllStats) Filter(filters ...StatsFilterFn) AllStats {
-	out := make(AllStats, 0, len(s))
+	// Should be one malloc on most requests, and one more at most.
+	out := make(AllStats, 0, 16384)
 
 	for i, stat := range s {
 		skip := false
