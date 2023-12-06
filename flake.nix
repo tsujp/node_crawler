@@ -113,9 +113,10 @@
             }
           ];
           packages = with pkgs; [
-            nix-prefetch
             go_1_21
             golangci-lint
+            graphviz
+            nix-prefetch
             nodejs
             sqlite-interactive
             templ
