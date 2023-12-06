@@ -253,6 +253,7 @@ type ChartXAxis struct {
 type ChartSeries struct {
 	Name      string              `json:"name"`
 	Type      string              `json:"type"`
+	Colour    string              `json:"color,omitempty"`
 	Stack     string              `json:"stack"`
 	AreaStyle struct{}            `json:"areaStyle"`
 	Emphasis  ChartSeriesEmphasis `json:"emphasis"`
@@ -365,6 +366,7 @@ func (s AllCountTotal) Timeseries() Timeseries {
 		chartSeries = append(chartSeries, ChartSeries{
 			Name:      key,
 			Type:      "line",
+			Colour:    "",
 			Stack:     "Total",
 			AreaStyle: struct{}{},
 			Emphasis: ChartSeriesEmphasis{
@@ -381,6 +383,29 @@ func (s AllCountTotal) Timeseries() Timeseries {
 
 	slices.SortStableFunc(legend, strings.Compare)
 
+	slices.SortFunc(chartSeries, func(a, b ChartSeries) int {
+		aData := a.Data[len(a.Data)-1]
+		bData := b.Data[len(b.Data)-1]
+
+		if aData == bData {
+			return 0
+		}
+
+		if bData == nil && aData != nil {
+			return 1
+		}
+
+		if aData == nil && bData != nil {
+			return -1
+		}
+
+		if *aData > *bData {
+			return 1
+		}
+
+		return -1
+	})
+
 	return Timeseries{
 		Legend: legend,
 		Series: chartSeries,
@@ -393,6 +418,14 @@ func (s AllCountTotal) Timeseries() Timeseries {
 		},
 		YAxisMax: nil,
 	}
+}
+
+func (t Timeseries) Colours(colours ...string) Timeseries {
+	for i := range t.Series {
+		t.Series[i].Colour = colours[i%len(colours)]
+	}
+
+	return t
 }
 
 func (t CountTotal) Limit(limit int) CountTotal {

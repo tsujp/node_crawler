@@ -70,19 +70,22 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	clientNames := allStats.CountClientName()
 	countries := allStats.GroupCountries()
 	OSs := allStats.GroupOS()
+	dialSuccess := allStats.GroupDialSuccess()
 
 	statsPage := public.Stats(
 		reqURL,
 		networkID,
 		synced,
 		[]templ.Component{
-			public.StatsGraph("Client Names", "client_names", clientNames.Timeseries()),
+			public.StatsGraph("Client Names (7d)", "client_names", clientNames.Timeseries().Percentage()),
+			public.StatsGraph("Dial Success (7d)", "dial_success", dialSuccess.Timeseries().Percentage().Colours("#05c091", "#ff6e76")),
 		},
 		[]templ.Component{
 			public.StatsGroup("Client Names", clientNames.Last()),
-			public.StatsGroup("Countries", countries.Last().Limit(20)),
+			public.StatsGroup("Countries", countries.Last()),
 			public.StatsGroup("OS / Archetectures", OSs.Last()),
 		},
+		len(clientNames) == 0,
 	)
 
 	index := public.Index(reqURL, statsPage, networkID, synced)

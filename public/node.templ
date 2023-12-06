@@ -223,39 +223,116 @@ templ SnapshotsList(files []fs.FileInfo) {
 }
 
 templ HelpPage(enode string) {
-	<div style="display: flex; flex-direction: column; gap: 1em; padding: 1em;">
-		<h2>Help</h2>
-		<div style="display: flex; flex-direction: column; gap: 0.5em;">
-			<h3>Add your node</h3>
-			<span>If your node is not found, it can be easily added.</span>
-			<h4>Geth</h4>
-			<span>Run the following command in the Javascript console:</span>
-			<code>
-				admin.addPeer('{ enode }')
-			</code>
-			<span>Or, as a command:</span>
-			<code>
-				geth --exec "admin.addPeer('{ enode }')"
-			</code>
-			<span>If you run Geth in a container:</span>
-			<code>
-				docker exec CONTAINER_NAME geth --exec "admin.addPeer('{ enode }')" attach /ethclient/geth/geth.ipc
-			</code>
-			<h3>Find your node ID</h3>
-			<span>Find your node ID so you can find your node on the website</span>
-			<h4>Geth</h4>
-			<span>Run the following command in the JavaScript console:</span>
-			<code>
-				admin.nodeInfo.id
-			</code>
-			<span>Or, as a command:</span>
-			<code>
-				geth --exec "admin.nodeInfo.id"
-			</code>
-			<span>If you run Geth in a container:</span>
-			<code>
-				docker exec CONTAINER_NAME geth --exec "admin.nodeInfo.id" attach /ethclient/geth/geth.ipc
-			</code>
+	<style>
+		:target {
+			color: #111;
+			background-color: orange;
+		}
+	</style>
+	<div style="display: flex; flex-direction: row; gap: 1em; padding: 1em; flex-wrap: wrap;">
+		<div>
+			<ul>
+				<li>
+					<a href="#add-your-node">Add Your Node</a>
+					<ul>
+						<li>
+							<a href="#add-your-node-rpc">RPC (All Clients)</a>
+						</li>
+						<li>
+							<a href="#add-your-node-geth">Geth</a>
+						</li>
+					</ul>
+				</li>
+				<li>
+					<a href="#find-node-id">Find Your Node ID</a>
+					<ul>
+						<li>
+							<a href="#find-node-id-rpc">RPC (All Clients)</a>
+						</li>
+						<li>
+							<a href="#find-node-id-geth">Geth</a>
+						</li>
+					</ul>
+				</li>
+			</ul>
+		</div>
+		<div style="display: flex; flex-direction: column; gap: 1em; padding: 1em; overflow-y: scroll">
+			<h2>Help</h2>
+			<div style="display: flex; flex-direction: column;">
+				<h3 id="#add-your-node">Add your node</h3>
+				<p>If your node is not found, it can be easily added.</p>
+
+				<h4 id="add-your-node-rpc">RPC (All Clients)</h4>
+				<p>
+					This is an admin method, to use it, you need to enable the admin API:
+				</p>
+
+				<div style="padding-inline-start: 1em;">
+					<h4>Besu</h4>
+					<p>
+						Add the startup flag: <code>--rpc-http-api</code>
+					</p>
+
+					<h4>Erigon</h4>
+					<p>
+						Add the startup flag: <code>--private.api.addr=localhost:8545</code>
+					</p>
+
+					<h4>Nethermind</h4>
+					<p>
+						Add the startup flags: <code>--JsonRpc.Enabled true --JsonRpc.EnabledModules admin</code>
+					</p>
+
+					<h4>Reth</h4>
+					<p>
+						Add the startup flags: <code>--http --http.api admin</code>
+					</p>
+				</div>
+
+				<p>Then you can add the peer with a curl command</p>
+				<code>
+					curl -X POST --data '{ `{"jsonrpc":"2.0","method":"admin_addPeer","params":["` + enode + `"],"id":1}` }' http://127.0.0.1:8545
+				</code>
+
+				<h4 id="add-your-node-geth">Geth</h4>
+				<p>Run the following command in the Javascript console:</p>
+				<code>
+					admin.addPeer('{ enode }')
+				</code>
+				<p>Or, as a command:</p>
+				<code>
+					geth --exec "admin.addPeer('{ enode }')"
+				</code>
+				<p>If you run Geth in a container:</p>
+				<code>
+					docker exec CONTAINER_NAME geth --exec "admin.addPeer('{ enode }')" attach /ethclient/geth/geth.ipc
+				</code>
+
+				<h3 id="find-node-id">Find your node ID</h3>
+				<p>Find your node ID so you can find your node on the website</p>
+
+				<h4 id="find-node-id-rpc">RPC (All Clients)</h4>
+				<p>
+					The RPC does not provide a way to get this information. :(
+				</p>
+				<p>
+					The best you can do is search for your IP address
+				</p>
+
+				<h4 id="find-node-id-geth">Geth</h4>
+				<p>Run the following command in the JavaScript console:</p>
+				<code>
+					admin.nodeInfo.id
+				</code>
+				<p>Or, as a command:</p>
+				<code>
+					geth --exec "admin.nodeInfo.id"
+				</code>
+				<p>If you run Geth in a container:</p>
+				<code>
+					docker exec CONTAINER_NAME geth --exec "admin.nodeInfo.id" attach /ethclient/geth/geth.ipc
+				</code>
+			</div>
 		</div>
 	</div>
 }
@@ -549,9 +626,6 @@ templ HistoryList(reqURL URL, history database.HistoryList) {
 	</div>
 }
 
-templ pageNumberButton(networkID int64, pageNumber int, isPage bool, synced int, query string) {
-}
-
 css pageButton() {
 	margin: 0.1em;
 	padding: 0.5em 1em;
@@ -631,10 +705,26 @@ templ SyncedFilterLinks(url URL, synced int) {
 	</div>
 }
 
-templ Stats(reqURL URL, networkID int64, synced int, charts []templ.Component, stats []templ.Component) {
+templ Stats(
+	reqURL URL,
+	networkID int64,
+	synced int,
+	charts []templ.Component,
+	stats []templ.Component,
+	isLoading bool,
+) {
 	<div style="display: flex; flex-direction: column; padding: 1em; gap: 1em;">
 		@NetworkFilterLinks(reqURL.WithPath("/"), networkID)
 		@SyncedFilterLinks(reqURL, synced)
+
+		if isLoading {
+			<span>
+				One or more charts are empty.
+				This could be because the data is being cached, or your set of filters
+				resulted in empty data.
+				Please try again soon.
+			</span>
+		}
 
 		<div style="display: flex; flex-direction: row; gap: 1em; flex-wrap: wrap;">
 			for _, chart := range charts {
@@ -648,7 +738,10 @@ templ Stats(reqURL URL, networkID int64, synced int, charts []templ.Component, s
 			}
 		</div>
 
-		<span style="align-self: flex-end;">Only shows nodes which were last found via discovery in the last 24 hours</span>
+		<div style="display: flex; flex-direction: column; align-items: flex-end; align-self: flex-end;">
+			<span>Only shows nodes which were last found via discovery in the last 24 hours</span>
+			<span>Updates every 30 minutes</span>
+		</div>
 	</div>
 }
 
@@ -670,6 +763,8 @@ script statsGraph(title string, id string, ts database.Timeseries) {
 	        backgroundColor: '#6a7985'
 	      },
 	    },
+			valueFormatter: (value) =>  value.toFixed(2) + '%',
+			order: 'valueDesc',
 	  },
 	  legend: {
 	    data: ts.legend,
@@ -710,11 +805,13 @@ templ StatsGroup(name string, stats database.CountTotal) {
 		<div style="background-color: #333; padding: 0.5em 0; width: 100%;">
 			<span style="padding-inline-start: 0.5em; white-space: nowrap;">Total ({ strconv.FormatInt(stats.Total, 10) })</span>
 		</div>
-		for _, stat := range stats.Values {
-			<div STYLE_REPLACE={ fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", stat.Count*100/stats.Total) }>
-				<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ stat.Key } ({ strconv.FormatInt(stat.Count, 10) })</span>
-			</div>
-		}
+		<div style="display: flex; flex-direction: column; max-height: 20em; overflow-y: scroll;">
+			for _, stat := range stats.Values {
+				<div STYLE_REPLACE={ fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", stat.Count*100/stats.Total) }>
+					<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ stat.Key } ({ strconv.FormatInt(stat.Count, 10) })</span>
+				</div>
+			}
+		</div>
 	</div>
 }
 
@@ -808,6 +905,11 @@ templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 				}
 				input {
 					font-size: inherit;
+				}
+				code {
+					padding: 1em 2em;
+					background-color: #222;
+					overflow-y: scroll;
 				}
 			</style>
 		</head>
