@@ -44,6 +44,7 @@ var (
 type ForkMaps struct {
 	Hash      map[uint32]string
 	BlockTime map[uint64]string
+	NextFork  *uint64
 }
 
 var Chains = map[int64]*params.ChainConfig{
@@ -76,6 +77,7 @@ var Forks = map[int64]ForkMaps{
 		bscForkNames,
 		bscForks,
 		[]*uint64{},
+		nil,
 	),
 }
 
@@ -212,6 +214,7 @@ func createForkMap(
 	forkNames []string,
 	blocks []*uint64,
 	times []*uint64,
+	nextFork *uint64,
 ) ForkMaps {
 	currentHash := crc32.ChecksumIEEE(genesis)
 
@@ -220,6 +223,7 @@ func createForkMap(
 			currentHash: "Genesis",
 		},
 		BlockTime: map[uint64]string{},
+		NextFork:  nextFork,
 	}
 
 	var previousBlock uint64 = 0
@@ -241,7 +245,7 @@ func createForkMap(
 
 	for i, blockTime := range times {
 		// Deduplicate blocks in the same fork
-		if blockTime != nil && previousBlockTime != *blockTime && *blockTime > genesisTime {
+		if blockTime != nil && previousBlockTime != *blockTime {
 			currentHash = checksumUpdate(currentHash, *blockTime)
 
 			name := forkNames[i+len(blocks)]
@@ -257,5 +261,12 @@ func createForkMap(
 
 func createEthereumForkMap(genesis *types.Block, config *params.ChainConfig) ForkMaps {
 	blocks, times := chainForks(config)
-	return createForkMap(genesis.Hash().Bytes(), genesis.Time(), EthereumForkNames, blocks, times)
+	return createForkMap(
+		genesis.Hash().Bytes(),
+		genesis.Time(),
+		EthereumForkNames,
+		blocks,
+		times,
+		config.CancunTime,
+	)
 }

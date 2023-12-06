@@ -49,6 +49,10 @@ func parseErrorParam(w http.ResponseWriter, str string) (int, bool) {
 	return parseAllYesNoParam(w, str, "error", -1)
 }
 
+func parseNextForkParam(w http.ResponseWriter, str string) (int, bool) {
+	return parseAllYesNoParam(w, str, "next-fork", -1)
+}
+
 func parsePageNum(w http.ResponseWriter, pageNumStr string) (int, bool) {
 	if pageNumStr == "" {
 		return 1, true
