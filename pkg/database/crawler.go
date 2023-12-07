@@ -169,7 +169,7 @@ func (db *DB) UpdateCrawledNodeSuccess(node common.NodeJSON) error {
 	}
 
 	clientPtr := parseClientID(&node.Info.ClientName)
-	if clientPtr == nil {
+	if clientPtr == nil && node.Info.ClientName != "" {
 		log.Error("parsing client ID failed", "id", node.Info.ClientName)
 	}
 
