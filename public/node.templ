@@ -807,6 +807,10 @@ templ Stats(
 	</div>
 }
 
+templ GraphsDisabled() {
+	<span>Graphs disabled because there's too many series</span>
+}
+
 script statsGraph(title string, id string, ts database.Timeseries) {
 	const chartDiv = document.getElementById(id)
 	const chart = echarts.init(chartDiv, 'dark');
