@@ -441,7 +441,13 @@ func (db *DB) GetNodeList(
 	return &out, nil
 }
 
-func (db *DB) GetStats(ctx context.Context, after time.Time, before time.Time) (AllStats, error) {
+func (db *DB) GetStats(
+	ctx context.Context,
+	after time.Time,
+	before time.Time,
+	networkID int64,
+	synced int,
+) (AllStats, error) {
 	var err error
 
 	start := time.Now()
@@ -467,7 +473,15 @@ func (db *DB) GetStats(ctx context.Context, after time.Time, before time.Time) (
 			FROM stats.crawled_nodes
 			WHERE
 				timestamp > ?1
-				AND timestamp < ?2
+				AND timestamp <= ?2
+				AND (
+					?3 = -1
+					OR network_id = ?3
+				)
+				AND (
+					?4 = -1
+					OR synced = ?4
+				)
 			ORDER BY
 				timestamp ASC,
 				total DESC,
@@ -476,6 +490,8 @@ func (db *DB) GetStats(ctx context.Context, after time.Time, before time.Time) (
 		`,
 		after.Unix(),
 		before.Unix(),
+		networkID,
+		synced,
 	)
 	if err != nil {
 		return AllStats{}, fmt.Errorf("query failed: %w", err)

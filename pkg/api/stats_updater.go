@@ -24,7 +24,7 @@ func (a *API) statsUpdaterDaemon() {
 			afterTs = oldStats[len(oldStats)-1].Timestamp
 		}
 
-		stats, err := a.db.GetStats(context.Background(), afterTs, start)
+		stats, err := a.db.GetStats(context.Background(), afterTs, start, -1, -1)
 		if err != nil {
 			log.Error("stats updater daemon: get stats failed", "err", err)
 			time.Sleep(time.Minute)

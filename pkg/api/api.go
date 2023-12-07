@@ -17,7 +17,7 @@ type API struct {
 
 	stats      database.AllStats
 	statsLock  sync.RWMutex
-	statsCache map[string][]byte
+	statsCache map[string]CachedPage
 }
 
 func New(
@@ -34,12 +34,17 @@ func New(
 
 		stats:      database.AllStats{},
 		statsLock:  sync.RWMutex{},
-		statsCache: map[string][]byte{},
+		statsCache: map[string]CachedPage{},
 	}
 
-	go api.statsUpdaterDaemon()
+	// go api.statsUpdaterDaemon()
 
 	return api
+}
+
+type CachedPage struct {
+	Page       []byte
+	ValidUntil time.Time
 }
 
 func (a *API) replaceStats(newStats database.AllStats) {
@@ -47,7 +52,7 @@ func (a *API) replaceStats(newStats database.AllStats) {
 	defer a.statsLock.Unlock()
 
 	a.stats = newStats
-	a.statsCache = map[string][]byte{}
+	a.statsCache = map[string]CachedPage{}
 }
 
 func (a *API) getStats() database.AllStats {
@@ -62,15 +67,25 @@ func (a *API) getCache(params string) ([]byte, bool) {
 	defer a.statsLock.RUnlock()
 
 	b, ok := a.statsCache[params]
+	if !ok {
+		return nil, false
+	}
 
-	return b, ok
+	if b.ValidUntil.Before(time.Now()) {
+		return nil, false
+	}
+
+	return b.Page, true
 }
 
-func (a *API) setCache(params string, b []byte) {
+func (a *API) setCache(params string, b []byte, validUntil time.Time) {
 	a.statsLock.Lock()
 	defer a.statsLock.Unlock()
 
-	a.statsCache[params] = b
+	a.statsCache[params] = CachedPage{
+		Page:       b,
+		ValidUntil: validUntil,
+	}
 }
 
 func (a *API) StartServer(wg *sync.WaitGroup, address string) {
