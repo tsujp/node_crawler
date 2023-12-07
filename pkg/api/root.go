@@ -155,7 +155,10 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 				"Client Names",
 				clientNames.Last(),
 				func(key string) templ.SafeURL {
-					return reqURL.WithParam("client-name", key).SafeURL()
+					return reqURL.
+						KeepParams("network", "synced", "next-fork").
+						WithParam("client-name", key).
+						SafeURL()
 				},
 			),
 		)
