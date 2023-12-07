@@ -449,7 +449,7 @@ func (t CountTotal) OrderBy(orderByFn CountTotalOrderFn) CountTotal {
 	}
 }
 
-func (s AllStats) CountClientName(filters ...StatsFilterFn) AllCountTotal {
+func (s AllStats) GroupClientName(filters ...StatsFilterFn) AllCountTotal {
 	return s.GroupBy(
 		func(s Stats) string {
 			return s.Client.Name
@@ -474,6 +474,24 @@ func (s AllStats) GroupCountries(filters ...StatsFilterFn) AllCountTotal {
 	return s.GroupBy(
 		func(s Stats) string {
 			return s.CountryStr()
+		},
+		filters...,
+	)
+}
+
+func (s AllStats) GroupClientVersion(filters ...StatsFilterFn) AllCountTotal {
+	return s.GroupBy(
+		func(s Stats) string {
+			return s.Client.Version
+		},
+		filters...,
+	)
+}
+
+func (s AllStats) GroupClientBuild(filters ...StatsFilterFn) AllCountTotal {
+	return s.GroupBy(
+		func(s Stats) string {
+			return s.Client.Build
 		},
 		filters...,
 	)

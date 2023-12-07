@@ -13,9 +13,11 @@ import (
 )
 
 func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
-	networkIDStr := r.URL.Query().Get("network")
-	syncedStr := r.URL.Query().Get("synced")
-	nextForkStr := r.URL.Query().Get("next-fork")
+	query := r.URL.Query()
+	networkIDStr := query.Get("network")
+	syncedStr := query.Get("synced")
+	nextForkStr := query.Get("next-fork")
+	clientName := query.Get("client-name")
 
 	networkID, found := parseNetworkID(w, networkIDStr)
 	if !found {
@@ -32,7 +34,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params := fmt.Sprintf("%d,%d,%d", networkID, synced, nextFork)
+	params := fmt.Sprintf("%s,%d,%d,%d", clientName, networkID, synced, nextFork)
 
 	b, found := a.getCache(params)
 	if found {
@@ -119,15 +121,75 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 			return isReady == (nextFork == 1)
 		},
+		func(_ int, s database.Stats) bool {
+			if clientName == "" {
+				return true
+			}
+
+			return s.Client.Name == clientName
+		},
 	)
+
 	log.Info("filter", "duration", time.Since(n))
 
 	reqURL := public.URLFromReq(r)
 
-	clientNames := allStats.CountClientName()
+	graphs := make([]templ.Component, 0, 2)
+	last := make([]templ.Component, 0, 4)
+
+	if clientName == "" {
+		clientNames := allStats.GroupClientName()
+
+		graphs = append(
+			graphs,
+			public.StatsGraph(
+				fmt.Sprintf("Client Names (%dd)", days),
+				"client_names",
+				clientNames.Timeseries().Percentage(),
+			),
+		)
+
+		last = append(
+			last,
+			public.StatsGroup("Client Names", clientNames.Last()),
+		)
+	} else {
+		clientVersions := allStats.GroupClientVersion()
+
+		graphs = append(
+			graphs,
+			public.StatsGraph(
+				fmt.Sprintf("Client Versions (%dd)", days),
+				"client_versions",
+				clientVersions.Timeseries().Percentage(),
+			),
+		)
+
+		last = append(
+			last,
+			public.StatsGroup("Client Versions", clientVersions.Last()),
+		)
+	}
+
 	countries := allStats.GroupCountries()
 	OSs := allStats.GroupOS()
+
+	last = append(
+		last,
+		public.StatsGroup("Countries", countries.Last()),
+		public.StatsGroup("OS / Archetectures", OSs.Last()),
+	)
+
 	dialSuccess := allStats.GroupDialSuccess()
+
+	graphs = append(
+		graphs,
+		public.StatsGraph(
+			fmt.Sprintf("Dial Success (%dd)", days),
+			"dial_success",
+			dialSuccess.Timeseries().Percentage().Colours("#05c091", "#ff6e76"),
+		),
+	)
 
 	log.Info("group", "duration", time.Since(n))
 
@@ -136,24 +198,9 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		networkID,
 		synced,
 		nextFork,
-		[]templ.Component{
-			public.StatsGraph(
-				fmt.Sprintf("Client Names (%dd)", days),
-				"client_names",
-				clientNames.Timeseries().Percentage(),
-			),
-			public.StatsGraph(
-				fmt.Sprintf("Dial Success (%dd)", days),
-				"dial_success",
-				dialSuccess.Timeseries().Percentage().Colours("#05c091", "#ff6e76"),
-			),
-		},
-		[]templ.Component{
-			public.StatsGroup("Client Names", clientNames.Last()),
-			public.StatsGroup("Countries", countries.Last()),
-			public.StatsGroup("OS / Archetectures", OSs.Last()),
-		},
-		len(clientNames) == 0,
+		graphs,
+		last,
+		len(allStats) == 0,
 	)
 
 	log.Info("page", "duration", time.Since(n))
