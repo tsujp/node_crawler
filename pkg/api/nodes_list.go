@@ -16,8 +16,8 @@ func (a *API) nodesListHandler(w http.ResponseWriter, r *http.Request) {
 	networkIDStr := urlQuery.Get("network")
 	syncedStr := urlQuery.Get("synced")
 	query := urlQuery.Get("q")
-	clientName := urlQuery.Get("client_name")
-	clientUserData := urlQuery.Get("client_user_data")
+	clientName := urlQuery.Get("client-name")
+	clientUserData := urlQuery.Get("client-user-data")
 
 	// This is a full node ID, just redirect to the node's page
 	if len(query) == 64 {

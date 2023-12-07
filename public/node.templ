@@ -393,6 +393,21 @@ func (u URL) WithParam(key, value string) URL {
 	return u
 }
 
+func (u URL) KeepParams(keys ...string) URL {
+	query := u.Query()
+	newQuery := url.Values{}
+
+	for _, key := range keys {
+		if query.Has(key) {
+			newQuery[key] = query[key]
+		}
+	}
+
+	u.RawQuery = newQuery.Encode()
+
+	return u
+}
+
 func (u URL) WithIntParam(key string, value int) URL {
 	valueStr := strconv.Itoa(value)
 
@@ -439,8 +454,8 @@ templ NodeList(reqURL URL, nodes database.NodeList) {
 				<input name="page" type="hidden" value={ strconv.Itoa(nodes.PageNumber) }/>
 				<input name="synced" type="hidden" value={ intToAllYesNo(nodes.Synced) }/>
 				<input class={ pageButton(), pageButtonActive() } name="q" type="text" placeholder="Search IP or Node ID" value={ nodes.Query }/>
-				<input class={ pageButton(), pageButtonActive() } name="client_name" type="text" placeholder="Search Client Name" value={ nodes.ClientName }/>
-				<input class={ pageButton(), pageButtonActive() } name="client_user_data" type="text" placeholder="Search Client User Data" value={ nodes.ClientUserData }/>
+				<input class={ pageButton(), pageButtonActive() } name="client-name" type="text" placeholder="Search Client Name" value={ nodes.ClientName }/>
+				<input class={ pageButton(), pageButtonActive() } name="client-user-data" type="text" placeholder="Search Client User Data" value={ nodes.ClientUserData }/>
 				<input class={ pageButton(), pageButtonActive() } type="submit" value="Search"/>
 			</form>
 			<div style="display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 0.5em;">
@@ -865,7 +880,7 @@ templ StatsGraph(title string, id string, ts database.Timeseries) {
 	@statsGraph(title, id, ts)
 }
 
-templ StatsGroup(name string, stats database.CountTotal) {
+templ StatsGroup(name string, stats database.CountTotal, hrefFn func(string) templ.SafeURL) {
 	<div style="display: flex; flex-direction: column; border: 1px solid orange; border-radius: 1em; padding: 1em; flex-grow: 1; min-width: 30%;">
 		<h2>{ name }</h2>
 		<div style="background-color: #333; padding: 0.5em 0; width: 100%;">
@@ -874,7 +889,13 @@ templ StatsGroup(name string, stats database.CountTotal) {
 		<div style="display: flex; flex-direction: column; max-height: 20em; overflow-y: scroll;">
 			for _, stat := range stats.Values {
 				<div STYLE_REPLACE={ fmt.Sprintf("background-color: #333; padding: 0.5em 0; width: %d%%", stat.Count*100/stats.Total) }>
-					<span style="padding-inline-start: 0.5em; white-space: nowrap;">{ stat.Key } ({ strconv.FormatInt(stat.Count, 10) })</span>
+					<span style="padding-inline-start: 0.5em; white-space: nowrap;">
+						if hrefFn(stat.Key) == "" {
+							{ stat.Key } ({ strconv.FormatInt(stat.Count, 10) })
+						} else {
+							<a href={hrefFn(stat.Key)}>{ stat.Key } ({ strconv.FormatInt(stat.Count, 10) })</a>
+						}
+					</span>
 				</div>
 			}
 		</div>
@@ -982,9 +1003,9 @@ templ Index(reqURL URL, main templ.Component, networkID int64, synced int) {
 		<body>
 			<nav>
 				<ul>
-					<li class={ templ.KV("active", reqURL.Path == "/") }><a href={ reqURL.WithPath("/").RemoveParam("after", "before").SafeURL() }>Stats</a></li>
-					<li class={ templ.KV("active", reqURL.Path == "/nodes/") }><a href={ reqURL.WithPath("/nodes/").RemoveParam("after", "before").WithParam("page", "1").SafeURL() }>Nodes</a></li>
-					<li class={ templ.KV("active", reqURL.Path == "/history/") }><a href={ reqURL.WithPath("/history/").RemoveParam("after", "before").SafeURL() }>Crawl History</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/") }><a href={ reqURL.WithPath("/").KeepParams("client-name", "network", "synced").SafeURL() }>Stats</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/nodes/") }><a href={ reqURL.WithPath("/nodes/").KeepParams("client-name", "network", "synced").WithParam("page", "1").SafeURL() }>Nodes</a></li>
+					<li class={ templ.KV("active", reqURL.Path == "/history/") }><a href={ reqURL.WithPath("/history/").KeepParams("network").SafeURL() }>Crawl History</a></li>
 					<li class={ templ.KV("active", reqURL.Path == "/help/") }><a href="/help/">Help</a></li>
 					<li class={ templ.KV("active", reqURL.Path == "/snapshots/") }><a href="/snapshots/">Snapshots</a></li>
 				</ul>

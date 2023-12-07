@@ -151,7 +151,13 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 		last = append(
 			last,
-			public.StatsGroup("Client Names", clientNames.Last()),
+			public.StatsGroup(
+				"Client Names",
+				clientNames.Last(),
+				func(key string) templ.SafeURL {
+					return reqURL.WithParam("client-name", key).SafeURL()
+				},
+			),
 		)
 	} else {
 		clientVersions := allStats.GroupClientVersion()
@@ -167,7 +173,11 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 		last = append(
 			last,
-			public.StatsGroup("Client Versions", clientVersions.Last()),
+			public.StatsGroup(
+				"Client Versions",
+				clientVersions.Last(),
+				func(_ string) templ.SafeURL { return "" },
+			),
 		)
 	}
 
@@ -176,8 +186,16 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	last = append(
 		last,
-		public.StatsGroup("Countries", countries.Last()),
-		public.StatsGroup("OS / Archetectures", OSs.Last()),
+		public.StatsGroup(
+			"Countries",
+			countries.Last(),
+			func(_ string) templ.SafeURL { return "" },
+		),
+		public.StatsGroup(
+			"OS / Archetectures",
+			OSs.Last(),
+			func(_ string) templ.SafeURL { return "" },
+		),
 	)
 
 	dialSuccess := allStats.GroupDialSuccess()
