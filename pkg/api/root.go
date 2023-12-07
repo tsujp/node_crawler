@@ -219,6 +219,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 		networkID,
 		synced,
 		nextFork,
+		clientName,
 		graphs,
 		last,
 		len(allStats) == 0,

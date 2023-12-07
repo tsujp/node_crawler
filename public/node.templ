@@ -785,6 +785,7 @@ templ Stats(
 	networkID int64,
 	synced int,
 	nextFork int,
+	clientName string,
 	charts []templ.Component,
 	stats []templ.Component,
 	isLoading bool,
@@ -793,6 +794,19 @@ templ Stats(
 		@NetworkFilterLinks(reqURL.WithPath("/"), networkID)
 		@SyncedFilterLinks(reqURL, synced)
 		@ReadyForNextForkLinksDisabled(reqURL, networkID, nextFork)
+		if clientName != "" {
+			<div style="display: flex; flex-direction: row; gap: 0.5em;">
+				<a
+					class={
+						pageButton(),
+						pageButtonActive(),
+					}
+					href={ reqURL.RemoveParam("client-name").SafeURL() }
+				>
+					Clear { clientName }
+				</a>
+			</div>
+		}
 
 		if isLoading {
 			<span>
