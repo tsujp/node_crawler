@@ -45,7 +45,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	fork, forkFound := database.Forks[networkID]
 
-	days := 7
+	days := 3
 
 	// All network ids has so much data, so we're prioritizing speed over days
 	// of data.
