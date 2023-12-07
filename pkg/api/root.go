@@ -99,26 +99,17 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 	clientNames := allStats.CountClientName()
 	countries := allStats.GroupCountries()
 	OSs := allStats.GroupOS()
-
-	graphs := []templ.Component{
-		public.GraphsDisabled(),
-	}
-
-	if len(allStats) < 2000000 {
-		dialSuccess := allStats.GroupDialSuccess()
-
-		graphs = []templ.Component{
-			public.StatsGraph("Client Names (7d)", "client_names", clientNames.Timeseries().Percentage()),
-			public.StatsGraph("Dial Success (7d)", "dial_success", dialSuccess.Timeseries().Percentage().Colours("#05c091", "#ff6e76")),
-		}
-	}
+	dialSuccess := allStats.GroupDialSuccess()
 
 	statsPage := public.Stats(
 		reqURL,
 		networkID,
 		synced,
 		nextFork,
-		graphs,
+		[]templ.Component{
+			public.StatsGraph("Client Names (2d)", "client_names", clientNames.Timeseries().Percentage()),
+			public.StatsGraph("Dial Success (2d)", "dial_success", dialSuccess.Timeseries().Percentage().Colours("#05c091", "#ff6e76")),
+		},
 		[]templ.Component{
 			public.StatsGroup("Client Names", clientNames.Last()),
 			public.StatsGroup("Countries", countries.Last()),
