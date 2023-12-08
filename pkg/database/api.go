@@ -483,10 +483,7 @@ func (db *DB) GetStats(
 					OR synced = ?4
 				)
 			ORDER BY
-				timestamp ASC,
-				total DESC,
-				client_name ASC,
-				client_version ASC
+				timestamp ASC
 		`,
 		after.Unix(),
 		before.Unix(),
