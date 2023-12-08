@@ -37,7 +37,7 @@ func strOrUnknown(s *string) string {
 	return *s
 }
 
-func New(
+func newClient(
 	name *string,
 	userData *string,
 	version *string,

@@ -459,7 +459,6 @@ func (db *DB) GetStats(
 			SELECT
 				timestamp,
 				client_name,
-				client_user_data,
 				client_version,
 				client_os,
 				client_arch,
@@ -498,14 +497,13 @@ func (db *DB) GetStats(
 	allStats := make([]Stats, 0, 1024)
 
 	for rows.Next() {
-		stats := Stats{} //nolint:exhaustruct
-		var clientName, clientUserData, clientVersion, clientOS, clientArch *string
+		var stats Stats
+		var clientName, clientVersion, clientOS, clientArch *string
 		var timestamp int64
 
 		err := rows.Scan(
 			&timestamp,
 			&clientName,
-			&clientUserData,
 			&clientVersion,
 			&clientOS,
 			&clientArch,
@@ -523,9 +521,9 @@ func (db *DB) GetStats(
 
 		stats.Timestamp = time.Unix(timestamp, 0)
 
-		stats.Client = New(
+		stats.Client = newClient(
 			clientName,
-			clientUserData,
+			nil,
 			clientVersion,
 			nil,
 			clientOS,
