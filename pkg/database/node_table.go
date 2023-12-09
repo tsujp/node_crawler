@@ -18,12 +18,13 @@ type NodeTableHistory struct {
 }
 
 func (h NodeTableHistory) CrawledAtLine() string {
-	return sinceUpdate(&h.CrawledAt)
+	return since(&h.CrawledAt)
 }
 
 type NodeTable struct {
 	nodeID         []byte
 	nodePubKey     []byte
+	firstFound     time.Time
 	lastFound      time.Time
 	updatedAt      *time.Time
 	NodeRecord     *enr.Record
@@ -219,23 +220,18 @@ func (n NodeTable) IsSynced() string {
 	return isSynced(n.updatedAt, n.HeadHashTime)
 }
 
-func sinceUpdate(updatedAt *time.Time) string {
-	if updatedAt == nil {
-		return "Never"
-	}
-
-	since := time.Since(*updatedAt)
-	if since < 0 {
-		return "In " + (-since).Truncate(time.Second).String()
-	}
-
-	return since.Truncate(time.Second).String() + " ago"
+func (n NodeTable) FirstFound() string {
+	return fmt.Sprintf(
+		"%s (%s)",
+		since(&n.firstFound),
+		n.lastFound.UTC().Format(DateFormat),
+	)
 }
 
 func (n NodeTable) LastFound() string {
 	return fmt.Sprintf(
 		"%s (%s)",
-		sinceUpdate(&n.lastFound),
+		since(&n.lastFound),
 		n.lastFound.UTC().Format(DateFormat),
 	)
 }
@@ -247,7 +243,7 @@ func (n NodeTable) UpdatedAt() string {
 
 	return fmt.Sprintf(
 		"%s (%s)",
-		sinceUpdate(n.updatedAt),
+		since(n.updatedAt),
 		n.updatedAt.UTC().Format(DateFormat),
 	)
 }
@@ -257,7 +253,7 @@ func (n NodeTable) NextCrawl() string {
 		return "Never"
 	}
 
-	return fmt.Sprintf("%s (%s)", sinceUpdate(n.nextCrawl), n.nextCrawl.UTC().Format(DateFormat))
+	return fmt.Sprintf("%s (%s)", since(n.nextCrawl), n.nextCrawl.UTC().Format(DateFormat))
 }
 
 func NetworkName(networkID *int64) string {

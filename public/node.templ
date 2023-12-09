@@ -55,6 +55,10 @@ templ NodeTable(nt database.NodeTable) {
 					<td>{ database.StringOrEmpty(nt.ClientLanguage) }</td>
 				</tr>
 				<tr>
+					<td>First Found (Discovery)</td>
+					<td>{ nt.FirstFound() }</td>
+				</tr>
+				<tr>
 					<td>Last Found (Discovery)</td>
 					<td>{ nt.LastFound() }</td>
 				</tr>

@@ -35,6 +35,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 			SELECT
 				disc.node_id,
 				disc.node_pubkey,
+				disc.first_found,
 				disc.last_found,
 				crawled.updated_at,
 				disc.node_record,
@@ -87,7 +88,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 
 	nodePage := new(NodeTable)
 
-	var lastFound int64
+	var firstFound, lastFound int64
 	var updatedAtInt, headHashTimeInt, nextCrawlInt *int64
 	var forkIDInt *uint32
 	var nodeRecord []byte
@@ -95,6 +96,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 	err = row.Scan(
 		&nodePage.nodeID,
 		&nodePage.nodePubKey,
+		&firstFound,
 		&lastFound,
 		&updatedAtInt,
 		&nodeRecord,
@@ -126,6 +128,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		return nil, fmt.Errorf("row scan failed: %w", err)
 	}
 
+	nodePage.firstFound = time.Unix(firstFound, 0)
 	nodePage.lastFound = time.Unix(lastFound, 0)
 	nodePage.updatedAt = int64PrtToTimePtr(updatedAtInt)
 	nodePage.HeadHashTime = int64PrtToTimePtr(headHashTimeInt)
@@ -555,7 +558,7 @@ func (r HistoryListRow) CrawledAtStr() string {
 }
 
 func (r HistoryListRow) SinceCrawled() string {
-	return sinceUpdate(&r.CrawledAt)
+	return since(&r.CrawledAt)
 }
 
 func (r HistoryListRow) NetworkIDStr() string {
