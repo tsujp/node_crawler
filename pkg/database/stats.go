@@ -74,7 +74,7 @@ func (db *DB) CopyStats() error {
 				AND crawled.network_id = blocks.network_id
 			)
 			WHERE
-				disc.last_found > unixepoch('now', '-24 hours')
+				disc.last_found > unixepoch('now', '-48 hours')
 			GROUP BY
 				crawled.client_name,
 				crawled.client_user_data,
