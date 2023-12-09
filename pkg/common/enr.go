@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
@@ -66,6 +67,21 @@ func LoadENR(b []byte) (*enr.Record, error) {
 	}
 
 	return &record, nil
+}
+
+func RecordPubKey(r *enr.Record) (*ecdsa.PublicKey, error) {
+	var pubkey enode.Secp256k1
+
+	err := r.Load(&pubkey)
+	if err != nil {
+		return nil, fmt.Errorf("load: %w", err)
+	}
+
+	return (*ecdsa.PublicKey)(&pubkey), nil
+}
+
+func PubkeyBytes(pubkey *ecdsa.PublicKey) []byte {
+	return crypto.FromECDSAPub(pubkey)[1:]
 }
 
 var IDv4 = string(enr.IDv4)

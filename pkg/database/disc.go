@@ -22,12 +22,14 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 		`
 			INSERT INTO discovered_nodes (
 				node_id,
+				node_pubkey,
 				node_record,
 				ip_address,
 				first_found,
 				last_found,
 				next_crawl
 			) VALUES (
+				?,
 				?,
 				?,
 				?,
@@ -42,6 +44,7 @@ func (d *DB) UpsertNode(node *enode.Node) error {
 				last_found = unixepoch()
 		`,
 		node.ID().Bytes(),
+		common.PubkeyBytes(node.Pubkey()),
 		common.EncodeENR(node.Record()),
 		node.IP().String(),
 	)

@@ -34,6 +34,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 		`
 			SELECT
 				disc.node_id,
+				disc.node_pubkey,
 				disc.last_found,
 				crawled.updated_at,
 				disc.node_record,
@@ -93,6 +94,7 @@ func (db *DB) GetNodeTable(ctx context.Context, nodeID string) (*NodeTable, erro
 
 	err = row.Scan(
 		&nodePage.nodeID,
+		&nodePage.nodePubKey,
 		&lastFound,
 		&updatedAtInt,
 		&nodeRecord,
@@ -291,6 +293,7 @@ func (db *DB) GetNodeList(
 		fmt.Sprintf(`
 			SELECT
 				disc.node_id,
+				disc.node_pubkey,
 				crawled.updated_at,
 				crawled.client_name,
 				crawled.client_user_data,
@@ -345,6 +348,7 @@ func (db *DB) GetNodeList(
 				AND (  -- Node ID filter
 					?3 IS NULL
 					OR (disc.node_id >= ?3 AND disc.node_id <= ?4)
+					OR (disc.node_pubkey >= ?3 AND disc.node_pubkey <= ?4)
 				)
 				AND (  -- IP address filter
 					?5 = ''
@@ -408,6 +412,7 @@ func (db *DB) GetNodeList(
 
 		err = rows.Scan(
 			&row.nodeID,
+			&row.nodePubKey,
 			&updatedAtInt,
 			&row.ClientName,
 			&userData,

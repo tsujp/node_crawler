@@ -19,6 +19,10 @@ templ NodeTable(nt database.NodeTable) {
 					<td>{ nt.NodeID() }</td>
 				</tr>
 				<tr>
+					<td>Public Key</td>
+					<td>{ nt.NodePubKey() }</td>
+				</tr>
+				<tr>
 					<td>Client Identifier</td>
 					<td>{ database.StringOrEmpty(nt.ClientID) }</td>
 				</tr>
@@ -247,7 +251,7 @@ templ HelpPage(enode string) {
 					</ul>
 				</li>
 				<li>
-					<a href="#find-node-id">Find Your Node ID</a>
+					<a href="#find-node-id">Find Your Node ID / Pubkey</a>
 					<ul>
 						<li>
 							<a href="#find-node-id-rpc">RPC (All Clients)</a>
@@ -293,6 +297,11 @@ templ HelpPage(enode string) {
 						Add the startup flag: <code>--private.api.addr=localhost:8545</code>
 					</p>
 
+					<h4>Geth</h4>
+					<p>
+						Add the startup flags: <code>--http --http.api admin</code>
+					</p>
+
 					<h4>Nethermind</h4>
 					<p>
 						Add the startup flags: <code>--JsonRpc.Enabled true --JsonRpc.EnabledModules admin</code>
@@ -323,15 +332,21 @@ templ HelpPage(enode string) {
 					docker exec CONTAINER_NAME geth --exec "admin.addPeer('{ enode }')" attach /ethclient/geth/geth.ipc
 				</code>
 
-				<h3 id="find-node-id">Find your node ID</h3>
+				<h3 id="find-node-id">Find your node ID / Pubkey</h3>
 				<p>Find your node ID so you can find your node on the website</p>
 
 				<h4 id="find-node-id-rpc">RPC (All Clients)</h4>
+
 				<p>
-					The RPC does not provide a way to get this information. :(
+					Follow the instructions <a href="#add-your-node-rpc">here</a> { `for` } your client
 				</p>
+				<p>Then get the data with a curl command</p>
+				<code>
+					{`curl -X POST --data '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}' http://127.0.0.1:8545`}
+				</code>
 				<p>
-					The best you can do is search for your IP address
+					In the response, you should see your node's Enode, and ID. Both of
+					these start with your node's public key.
 				</p>
 
 				<h4 id="find-node-id-geth">Geth</h4>
@@ -453,7 +468,7 @@ templ NodeList(reqURL URL, nodes database.NodeList) {
 				<input name="network" type="hidden" value={ strconv.FormatInt(nodes.NetworkFilter, 10) }/>
 				<input name="page" type="hidden" value={ strconv.Itoa(nodes.PageNumber) }/>
 				<input name="synced" type="hidden" value={ intToAllYesNo(nodes.Synced) }/>
-				<input class={ pageButton(), pageButtonActive() } name="q" type="text" placeholder="Search IP or Node ID" value={ nodes.Query }/>
+				<input class={ pageButton(), pageButtonActive() } name="q" type="text" placeholder="Search IP, ID, or Pubkey" value={ nodes.Query }/>
 				<input class={ pageButton(), pageButtonActive() } name="client-name" type="text" placeholder="Search Client Name" value={ nodes.ClientName }/>
 				<input class={ pageButton(), pageButtonActive() } name="client-user-data" type="text" placeholder="Search Client User Data" value={ nodes.ClientUserData }/>
 				<input class={ pageButton(), pageButtonActive() } type="submit" value="Search"/>
@@ -486,6 +501,7 @@ templ NodeList(reqURL URL, nodes database.NodeList) {
 				<thead>
 					<tr>
 						<td>Node ID</td>
+						<td>Node Pubkey</td>
 						<td>Client Name</td>
 						<td>Client Version</td>
 						<td>Client Build</td>
@@ -501,6 +517,7 @@ templ NodeList(reqURL URL, nodes database.NodeList) {
 					for _, row := range nodes.List {
 						<tr>
 							<td><a href={ templ.URL("/nodes/" + row.NodeID()) }>{ row.NodeID()[:8] }</a></td>
+							<td>{ row.NodePubKey()[:8] }</td>
 							<td>{ database.StringOrEmpty(row.ClientName) }</td>
 							<td>{ database.StringOrEmpty(row.ClientVersion) }</td>
 							<td>{ database.StringOrEmpty(row.ClientBuild) }</td>

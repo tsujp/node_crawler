@@ -15,6 +15,7 @@ func (db *DB) MigrateCrawler() error {
 			migrationCrawler000Schema,
 			migrationCrawler001CrawledNodes,
 			migrationCrawler002ENRBlob,
+			migrationCrawler003NodePubkey,
 		},
 		migrateCrawlerIndexes,
 	)
@@ -396,6 +397,115 @@ func migrationCrawler002ENRBlob(tx *sql.Tx) error {
 	_, err = tx.Exec("DROP TABLE discovered_nodes_old")
 	if err != nil {
 		return fmt.Errorf("drop old table failed: %w", err)
+	}
+
+	return nil
+}
+
+func migrationCrawler003NodePubkey(tx *sql.Tx) error {
+	_, err := tx.Exec("ALTER TABLE discovered_nodes RENAME TO discovered_nodes_old")
+	if err != nil {
+		return fmt.Errorf("renaming table: %w", err)
+	}
+
+	_, err = tx.Exec(`
+		CREATE TABLE discovered_nodes (
+			node_id		BLOB	PRIMARY KEY,
+			node_pubkey	BLOB	NOT NULL,
+			node_record	BLOB	NOT NULL,
+			ip_address	TEXT	NOT NULL,
+			first_found	INTEGER	NOT NULL,
+			last_found	INTEGER	NOT NULL,
+			next_crawl	INTEGER	NOT NULL
+		) STRICT;
+	`)
+	if err != nil {
+		return fmt.Errorf("create table: %w", err)
+	}
+
+	oldRows, err := tx.Query(`
+		SELECT
+			node_id,
+			node_record,
+			ip_address,
+			first_found,
+			last_found,
+			next_crawl
+		FROM discovered_nodes_old
+	`)
+	if err != nil {
+		return fmt.Errorf("querying old nodes: %w", err)
+	}
+	defer oldRows.Close()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO discovered_nodes (
+			node_id,
+			node_pubkey,
+			node_record,
+			ip_address,
+			first_found,
+			last_found,
+			next_crawl
+		) VALUES (
+			?,
+			?,
+			?,
+			?,
+			?,
+			?,
+			?
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("prepare: %w", err)
+	}
+	defer stmt.Close()
+
+	for oldRows.Next() {
+		var nodeID, nodeRecord []byte
+		var ipAddress string
+		var firstFound, lastFound, nextCrawl int64
+
+		err := oldRows.Scan(
+			&nodeID,
+			&nodeRecord,
+			&ipAddress,
+			&firstFound,
+			&lastFound,
+			&nextCrawl,
+		)
+		if err != nil {
+			return fmt.Errorf("scan old row: %w", err)
+		}
+
+		record, err := common.LoadENR(nodeRecord)
+		if err != nil {
+			return fmt.Errorf("parse node: %w", err)
+		}
+
+		pubKey, err := common.RecordPubKey(record)
+		if err != nil {
+			return fmt.Errorf("loading pub key: %w", err)
+		}
+
+		_, err = stmt.Exec(
+			nodeID,
+			common.PubkeyBytes(pubKey),
+			&nodeRecord,
+			ipAddress,
+			firstFound,
+			lastFound,
+			nextCrawl,
+		)
+		if err != nil {
+			return fmt.Errorf("insert row: %w", err)
+		}
+	}
+
+	_, err = tx.Exec("DROP TABLE discovered_nodes_old")
+	if err != nil {
+		return fmt.Errorf("drop old table: %w", err)
 	}
 
 	return nil

@@ -23,6 +23,7 @@ func (h NodeTableHistory) CrawledAtLine() string {
 
 type NodeTable struct {
 	nodeID         []byte
+	nodePubKey     []byte
 	lastFound      time.Time
 	updatedAt      *time.Time
 	NodeRecord     *enr.Record
@@ -150,6 +151,10 @@ func IntOrEmpty[T int | int64](v *T) string {
 
 func (n NodeTable) NodeID() string {
 	return hex.EncodeToString(n.nodeID)
+}
+
+func (n NodeTable) NodePubKey() string {
+	return hex.EncodeToString(n.nodePubKey)
 }
 
 func (n NodeTable) NetworkID() string {

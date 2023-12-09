@@ -16,6 +16,7 @@ func int64PrtToTimePtr(i *int64) *time.Time {
 
 type NodeListRow struct {
 	nodeID            []byte
+	nodePubKey        []byte
 	UpdatedAt         *time.Time
 	ClientName        *string
 	ClientVersion     *string
@@ -29,6 +30,10 @@ type NodeListRow struct {
 
 func (n NodeListRow) NodeID() string {
 	return hex.EncodeToString(n.nodeID)
+}
+
+func (n NodeListRow) NodePubKey() string {
+	return hex.EncodeToString(n.nodePubKey)
 }
 
 func (n NodeListRow) SinceUpdate() string {
