@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -11,7 +12,7 @@ func since(updatedAt *time.Time) string {
 	}
 
 	since := time.Since(*updatedAt)
-	hours := int64(since.Hours())
+	hours := int64(math.Abs(since.Hours()))
 	days := hours / 24
 	since -= time.Duration(days) * 24 * time.Hour
 
