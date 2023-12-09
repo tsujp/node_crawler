@@ -61,7 +61,21 @@ func (db *DB) CopyStats() error {
 						AND history.crawled_at > unixepoch('now', '-7 days')
 						AND (
 							history.error IS NULL
-							OR history.error IN ('too many peers')
+							OR history.error IN (  -- Disconnect Reasons
+								'disconnect requested',
+								'network error',
+								'breach of protocol',
+								'useless peer',
+								'too many peers',
+								'already connected',
+								'incompatible p2p protocol version',
+								'invalid node identity',
+								'client quitting',
+								'unexpected identity',
+								'connected to self',
+								'read timeout',
+								'subprotocol error'
+							)
 						)
 				) dial_success,
 				COUNT(*) total
