@@ -27,8 +27,9 @@ import (
 //nolint:exhaustruct
 var app = &cli.App{
 	Name:        filepath.Base(os.Args[0]),
-	Version:     "v0.0.1",
-	HideVersion: true,
+	Usage:       "Crawls the Ethereum network, and visualises collected data",
+	Version:     "0.1.0",
+	HideVersion: false,
 	Flags:       Flags,
 	Before:      Setup,
 	Commands: []*cli.Command{

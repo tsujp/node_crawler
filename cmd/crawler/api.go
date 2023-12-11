@@ -16,7 +16,7 @@ import (
 //nolint:exhaustruct
 var apiCommand = &cli.Command{
 	Name:   "api",
-	Usage:  "API server for the crawler",
+	Usage:  "API server",
 	Action: runAPI,
 	Flags: []cli.Flag{
 		&apiListenAddrFlag,
