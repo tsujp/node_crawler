@@ -31,3 +31,6 @@ public/*_templ.go
 
 # nix
 result
+
+.idea
+_dbs/
