@@ -1,0 +1,29 @@
+package components
+
+// TODO: Read from implicit ctx just for the title and opengraph stuff.
+
+templ Index22() {
+	<!DOCTYPE html>
+	<html lang="en-US">
+		<head>
+			<title>Ethernets - Node Crawler</title>
+			<meta charset="utf-8"/>
+			<meta http-equiv="x-ua-compatible" content="ie=edge"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
+			<link rel="stylesheet" type="text/css" href="/static/style.css"/>
+			<meta property="og:site_name" content="Ethernets"/>
+			<meta property="og:url" content="https://www.ethernets.io"/>
+			<meta property="og:title" content="Ethernets Node Crawler"/>
+			<meta property="og:description" content="Crawls all the Ethereum networks."/>
+			<meta property="og:image" content="/eth-diamond-purple.png"/>
+		</head>
+		<body>
+			<p>Foo</p>
+			<div class="foobar">Div text</div>
+			<div class="foobar">Div text</div>
+			<div class="foobar">Div text</div>
+			@Button("some active button", false)
+			@Button("some disabled button", true)
+		</body>
+	</html>
+}

@@ -1,18 +1,9 @@
 package public
 
-import _ "embed"
-
-//go:embed blue-marble.png
-var blueMarble []byte
-
-//go:embed eth-diamond-purple.png
-var ethDiamondPurple []byte
+import "embed"
 
 //go:embed favicon.ico
 var Favicon []byte
 
-var StaticFiles = map[string][]byte{
-	"blue-marble.png":        blueMarble,
-	"eth-diamond-purple.png": ethDiamondPurple,
-	"favicon.ico":            Favicon,
-}
+//go:embed blue-marble.png eth-diamond-purple.png style.css
+var StaticFiles embed.FS

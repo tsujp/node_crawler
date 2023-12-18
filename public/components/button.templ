@@ -1,0 +1,8 @@
+package components
+
+// TODO: PR to `templ`, a false attribute should not exist instead of being
+//       set to `=""`.
+
+templ Button(content string, disabled bool) {
+  <button disabled?={ disabled }>{ content }</button>
+}

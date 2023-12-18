@@ -1,0 +1,115 @@
+/* TODO: Normalise also? */
+
+/*//////////////////////////////////////////////////////////////////////////////
+  //// MINIMAL / GOOD-LOOKING
+  ////////////////////////////////////////////////////////////////////////////*/
+html {
+	max-width: 72ch;
+
+	/* Larger spacing on larger screens; very small spacing on tiny screens. */
+	padding: calc(1vmin + .5rem);
+
+	/* Shorthand for `margin-left/margin-right`. */
+	margin-inline: auto;
+
+	/* Fluid sizing: https://frontaid.io/blog/fluid-typography-2d-css-locks-clamp/ */
+	font-size: clamp(1em, 0.909em + 0.45vmin, 1.125em);
+
+	/* TODO: Maybe last 1.5em */
+	/* TODO: Backup with `system-ui`? */
+	font-family: -apple-system, BlinkMacSystemFont, "Avenir Next", "Avenir",
+		"Segoe UI", "Lucida Grande", "Helvetica Neue", "Helvetica", "Fira Sans",
+		"Roboto", "Noto", "Droid Sans", "Cantarell", "Oxygen", "Ubuntu",
+		"Franklin Gothic Medium", "Century Gothic", "Liberation Sans", sans-serif;
+}
+
+/* Increase line-height for everything except headings. Supported on modern
+     browsers, fine to use: https://caniuse.com/css-matches-pseudo */
+body :not(:is(h1, h2, h3, h4, h5, h6)) {
+	line-height: 1.38;
+}
+
+/*//////////////////////////////////////////////////////////////////////////////
+  //// BASE
+  ////////////////////////////////////////////////////////////////////////////*/
+
+:root,
+::backdrop {
+	/* Opt-in to operating system setting light/dark based on user preference. */
+	color-scheme: dark light;
+
+	/* Default theme is dark... */
+	/* I'm going to try and use the Modus Vivendi themes because Prot has put a lot
+	   of work into them and they meet accessibility standards which is a goal I
+		 have for the frontend of this project. Prot's very good work can be found:
+		   1. Here for the themes: https://protesilaos.com/emacs/modus-themes
+			 2. Here for the colour palletes: https://protesilaos.com/emacs/modus-themes-colors */
+	--bg: #1E1E1E;
+}
+
+/* ...so media query for user preference only need check for light-theme */
+@media (prefers-color-scheme: light) {
+
+	:root,
+	::backdrop {
+		--bg: #FFF;
+	}
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	font-weight: 500;
+}
+
+/* TODO: For other h elements. */
+h2 {
+	margin-block-start: 1.38em;
+	/* 0.83em appears to be default for Firefox. */
+	margin-block-end: 0.3em;
+}
+
+p {
+	margin-block-start: 0;
+}
+
+/* TODO: Get actual syntax highlighting styles later on, for now this is fine.
+   TODO: Should be <pre> wrapper with <code> inner for code blocks and for
+         a simple string `like this` just a pre. Currently it's the inverse. */
+pre,
+code {
+	font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo,
+		Consolas, 'DejaVu Sans Mono', monospace;
+	background: #f5f5f5;
+}
+
+pre {
+	font-size: 0.8rem;
+	padding: 10px;
+	overflow-y: auto;
+}
+
+/* TODO: See above. */
+code {
+	padding: 1px 3px;
+}
+
+/* body {
+	background-color: #fbc547;
+	color: #333;
+	padding: 18vh 1rem;
+	text-align: center;
+} */
+
+.foobar {
+	background: red;
+	color: black;
+	border: 1px solid cyan;
+
+	&:hover {
+		color: green;
+	}
+}

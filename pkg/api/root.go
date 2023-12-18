@@ -10,9 +10,23 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/node-crawler/pkg/database"
 	"github.com/ethereum/node-crawler/public"
+	"github.com/ethereum/node-crawler/public/components"
 )
 
 func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
+	index := components.Index22()
+
+	sb := new(strings.Builder)
+	_ = index.Render(r.Context(), sb)
+
+	out := strings.ReplaceAll(sb.String(), "STYLE_REPLACE", "style")
+
+	log.Info(out)
+
+	_, _ = w.Write([]byte(out))
+}
+
+func (a *API) handleRoot22(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	networkIDStr := query.Get("network")
 	syncedStr := query.Get("synced")
@@ -195,7 +209,7 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 			func(_ string) templ.SafeURL { return "" },
 		),
 		public.StatsGroup(
-			"OS / Archetectures",
+			"OS / Architectures",
 			OSs.Last(),
 			func(_ string) templ.SafeURL { return "" },
 		),
@@ -214,20 +228,25 @@ func (a *API) handleRoot(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("group", "duration", time.Since(n))
 
-	statsPage := public.Stats(
-		reqURL,
-		networkID,
-		synced,
-		nextFork,
-		clientName,
-		graphs,
-		last,
-		len(allStats) == 0,
-	)
+	// TODO: Temporary comment-out.
+	//statsPage := public.Stats(
+	//	reqURL,
+	//	networkID,
+	//	synced,
+	//	nextFork,
+	//	clientName,
+	//	graphs,
+	//	last,
+	//	len(allStats) == 0,
+	//)
 
 	log.Info("page", "duration", time.Since(n))
 
-	index := public.Index(reqURL, statsPage, networkID, synced)
+	// TODO: Replace properly.
+	// index := public.Index(reqURL, statsPage, networkID, synced)
+
+	// Temporary.
+	index := components.Index22()
 
 	sb := new(strings.Builder)
 	_ = index.Render(r.Context(), sb)

@@ -7,6 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/node-crawler/pkg/database"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/ethereum/node-crawler/public"
 )
 
 type API struct {
@@ -88,19 +91,55 @@ func (a *API) setCache(params string, b []byte, validUntil time.Time) {
 	}
 }
 
+func NodeRoot(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("nodes ROOT"))
+}
+
+func NodeById(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("nodes BY ID"))
+}
+
+func SiteRoot(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("site ROOT"))
+}
+
 func (a *API) StartServer(wg *sync.WaitGroup, address string) {
 	defer wg.Done()
 
-	router := http.NewServeMux()
+	// It's nicer (for developers) to have all the routes in one place .'.
+	//   being easier to reason about.
 
-	router.HandleFunc("/", a.handleRoot)
-	router.HandleFunc("/favicon.ico", handleFavicon)
-	router.HandleFunc("/help/", a.handleHelp)
-	router.HandleFunc("/history/", a.handleHistoryList)
-	router.HandleFunc("/nodes/", a.nodesHandler)
-	router.HandleFunc("/snapshots/", a.handleSnapshots)
-	router.HandleFunc("/static/", handleStatic)
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.Logger)
+
+	// TODO: Middleware to strip trailing slash off of URL.
+	// TODO: Site name via config.
+
+	// xx/nodes?page=N&synced=[yes|no]&network=NAME
+	// xx/nodes/id
+	r.Route("/", func(r chi.Router) {
+		r.Get("/", a.handleRoot)
+		r.Get("/favicon.ico", handleFavicon)
+		serveEmbeddedFiles(r, "/static", public.StaticFiles)
+	})
+
+	r.Route("/nodes", func(r chi.Router) {
+		r.Get("/", NodeRoot)
+		r.Get("/{nodeId}", NodeById)
+	})
 
 	log.Info("Starting API", "address", address)
-	_ = http.ListenAndServe(address, router)
+	http.ListenAndServe(address, r)
+
+	// TODO: Old routes added back in (gradually as frontend developed).
+	// router.HandleFunc("/", a.handleRoot)
+	// router.HandleFunc("/favicon.ico", handleFavicon)
+	// router.HandleFunc("/help/", a.handleHelp)
+	// router.HandleFunc("/history/", a.handleHistoryList)
+	// router.HandleFunc("/nodes/", a.nodesHandler)
+	// router.HandleFunc("/snapshots/", a.handleSnapshots)
+	// router.HandleFunc("/static/", handleStatic)
+
+	// log.Info("Starting API", "address", address)
 }
